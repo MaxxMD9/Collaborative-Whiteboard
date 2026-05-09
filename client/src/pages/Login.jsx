@@ -1,30 +1,27 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  const { login }               = useAuth();
+  const navigate                = useNavigate();
 
   async function handleLogin(e) {
     e.preventDefault();
 
     const res = await fetch("http://localhost:3001/api/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
 
     if (res.ok) {
-      localStorage.setItem("token", data.token);
-
-      alert("Login successful!");
+      login(data.user, data.token);
+      navigate("/whiteboard");
     } else {
       alert(data.error);
     }
@@ -34,43 +31,16 @@ export default function Login() {
     <div style={styles.container}>
       <form style={styles.form} onSubmit={handleLogin}>
         <h1>Login</h1>
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         <button type="submit">Login</button>
-
-        <p>
-          No account? <Link to="/register">Register</Link>
-        </p>
+        <p>No account? <Link to="/register">Register</Link></p>
       </form>
     </div>
   );
 }
 
 const styles = {
-  container: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-  },
-
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-    width: "300px",
-  },
+  container: { display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" },
+  form: { display: "flex", flexDirection: "column", gap: "10px", width: "300px" },
 };

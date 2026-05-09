@@ -4,9 +4,10 @@ import "./WhiteboardPage.css";
 
 import "katex/dist/katex.min.css";
 import katex from "katex";
+import { useAuth } from "../context/AuthContext";
 
 // Routing
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 
 function WhiteboardPage() {
@@ -93,6 +94,9 @@ function WhiteboardPage() {
   
   /* ACCOUNT BUTTON VARIABLE */
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
 
   // Update a setting while preserving the rest
   function handleSettingChange(key, value) {
@@ -1211,9 +1215,12 @@ useEffect(() => {
               <Link to="/whiteboard" className="account-dropdown-link">
                 My Account
               </Link>
-              <Link to="/" className="account-dropdown-link">
+              <button
+                className="account-dropdown-link"
+                onClick={() => { logout(); navigate("/"); }}
+              >
                 Sign Out
-              </Link>
+            </button>
             </div>
           )}
         </div>
