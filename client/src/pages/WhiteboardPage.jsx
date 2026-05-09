@@ -853,12 +853,12 @@ function WhiteboardPage() {
 
     if (item.kind === "textbox") {
       setTextBoxes(previous => previous.filter(textBox => textBox.id !== item.value.id));
-
-      if (item.kind === "equation") {
-        setEquations(previous => previous.filter(equation => equation.id !== item.value.id) );
-        setSelectedEquationId(null);
-      }
       setSelectedTextBoxId(null);
+    }
+
+    if (item.kind === "equation") {
+      setEquations(previous => previous.filter(equation => equation.id !== item.value.id));
+      setSelectedEquationId(null);
     }
     redrawBoard();
     setStatus("Undo complete");
@@ -908,6 +908,9 @@ function WhiteboardPage() {
   // 
   function selectTool(nextTool) {
     setTool(nextTool);
+    setSelectedTextBoxId(null);
+    setSelectedEquationId(null);
+    setEquationInput(null);
     setStatus(`${nextTool.charAt(0).toUpperCase() + nextTool.slice(1)} selected`);
   }
 
@@ -1013,6 +1016,17 @@ useEffect(() => {
         <div className="brand">Whiteboard</div>
 
         <nav className="toolbar" aria-label="Whiteboard tools">
+          
+          <button
+          className={`tool-button image-tool-button ${tool === "move" ? "active" : ""}`}
+          type="button"
+          onClick={() => selectTool("move")}
+          title="Move (M)"
+          aria-label="Move">
+          <img src="/assets/cursors/move_cursor.png" alt="" />
+          <span>Move</span>
+          </button>
+
           <button
            className={`tool-button image-tool-button ${tool === "pencil" ? "active" : ""}`}
            type="button"
@@ -1312,6 +1326,11 @@ useEffect(() => {
               }}
               onKeyDown={event => {
                 if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                  setSelectedTextBoxId(null);
+                }
+                if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
                   event.currentTarget.blur();
                   setSelectedTextBoxId(null);
