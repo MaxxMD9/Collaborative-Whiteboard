@@ -7,8 +7,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 // Pages
 import AboutPage      from "./pages/AboutPage";
-import LoginPage      from "./pages/LoginPage";
-import RegisterPage   from "./pages/RegisterPage";
+import Home           from "./pages/Home";
+import Login          from "./pages/Login";
+import Register       from "./pages/Register";
 import WhiteboardPage from "./pages/WhiteboardPage";
 
 import "./App.css";
@@ -20,10 +21,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Routes>
           {/* Public routes */}
           <Route path="/"         element={<AboutPage />} />
-          <Route path="/login"    element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/home"     element={<Home />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-          {/* Protected you'll have to be logged in */}
+          {/* Protected — must be logged in */}
           <Route
             path="/whiteboard"
             element={
@@ -33,7 +35,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             }
           />
 
-          {/* Catch all - redirects unknown URLs to home */}
+          {/* Catch-all — redirect unknown URLs to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
