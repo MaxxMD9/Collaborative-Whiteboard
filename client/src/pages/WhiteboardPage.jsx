@@ -1070,7 +1070,7 @@ useEffect(() => {
   return (
     <main className="app">
       <header className="top-header">
-        <Link to="/lobby" className="brand">Whiteboard</Link>
+        <Link to="/lobby" className="brand" style={{ color: "#ffffff", textDecoration: "none" }}>Whiteboard</Link>
 
         <nav className="toolbar" aria-label="Whiteboard tools">
           
