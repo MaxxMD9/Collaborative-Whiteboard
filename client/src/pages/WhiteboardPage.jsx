@@ -20,7 +20,7 @@ function WhiteboardPage() {
   const { logout } = useAuth();
   const navigate   = useNavigate();
   const location = useLocation();
-  
+
   /* CANVAS VARIABLES */
   const boardAreaRef = useRef(null);
   const canvasRef = useRef(null);
@@ -969,7 +969,7 @@ useEffect(() => {
     historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
     strokesRef.current = strokes;
     setStrokeCount(strokes.length);
-    redrawBoard();
+    requestAnimationFrame(() => redrawBoard());
   });
 
   // Receive strokes from other users
@@ -1070,7 +1070,7 @@ useEffect(() => {
   return (
     <main className="app">
       <header className="top-header">
-        <div className="brand">Whiteboard</div>
+        <Link to="/lobby" className="brand">Whiteboard</Link>
 
         <nav className="toolbar" aria-label="Whiteboard tools">
           

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -6,10 +6,21 @@ export default function Lobby() {
   const { user, token, logout } = useAuth();
   const navigate                = useNavigate();
 
-  const [roomName, setRoomName]   = useState("");
+  const [roomName, setRoomName]     = useState("");
   const [inviteCode, setInviteCode] = useState("");
-  const [error, setError]         = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const [error, setError]           = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [boards, setBoards]         = useState([]);
+
+  // Load existing boards on mount
+  useEffect(() => {
+    fetch("http://localhost:3001/api/boards", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => setBoards(data.boards || []))
+      .catch(() => setError("Could not load boards"));
+  }, [token]);
 
   async function handleCreateRoom(e) {
     e.preventDefault();
@@ -102,10 +113,7 @@ export default function Lobby() {
                 style={styles.input}
                 required
               />
-              <button
-                type="submit"
-                style={styles.primaryButton}
-                disabled={loading}>
+              <button type="submit" style={styles.primaryButton} disabled={loading}>
                 {loading ? "Creating..." : "Create Room"}
               </button>
             </form>
@@ -126,15 +134,34 @@ export default function Lobby() {
                 style={styles.input}
                 required
               />
-              <button
-                type="submit"
-                style={styles.primaryButton}
-                disabled={loading}>
+              <button type="submit" style={styles.primaryButton} disabled={loading}>
                 {loading ? "Joining..." : "Join Room"}
               </button>
             </form>
           </div>
         </div>
+
+        {/* Existing Boards */}
+        {boards.length > 0 && (
+          <div style={styles.boardsSection}>
+            <h2 style={styles.boardsTitle}>Your Rooms</h2>
+            <div style={styles.boardsGrid}>
+              {boards.map(board => (
+                <div
+                  key={board._id}
+                  style={styles.boardCard}
+                  onClick={() => navigate("/whiteboard", { state: { roomName: board.roomName } })}
+                >
+                  <div style={styles.boardIcon}>📋</div>
+                  <div style={styles.boardName}>{board.roomName}</div>
+                  <div style={styles.boardMeta}>
+                    Created by {board.createdBy?.username || "unknown"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -155,10 +182,10 @@ const styles = {
     padding:         "0 24px"
   },
   logo: {
-    color:     "#ffffff",
-    fontSize:  "18px",
+    color:      "#ffffff",
+    fontSize:   "18px",
     fontWeight: "800",
-    margin:    0
+    margin:     0
   },
   headerRight: {
     display:    "flex",
@@ -179,7 +206,7 @@ const styles = {
     fontSize:     "13px"
   },
   main: {
-    maxWidth: "800px",
+    maxWidth: "900px",
     margin:   "60px auto",
     padding:  "0 24px"
   },
@@ -234,5 +261,41 @@ const styles = {
     fontWeight:   "700",
     cursor:       "pointer",
     fontSize:     "14px"
+  },
+  boardsSection: {
+    marginTop: "40px"
+  },
+  boardsTitle: {
+    fontSize:     "18px",
+    fontWeight:   "700",
+    color:        "#111827",
+    marginBottom: "16px"
+  },
+  boardsGrid: {
+    display:             "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap:                 "16px"
+  },
+  boardCard: {
+    background:   "#ffffff",
+    borderRadius: "12px",
+    padding:      "20px",
+    boxShadow:    "0 2px 12px rgba(0,0,0,0.06)",
+    cursor:       "pointer",
+    transition:   "transform 0.15s ease, box-shadow 0.15s ease"
+  },
+  boardIcon: {
+    fontSize:     "32px",
+    marginBottom: "8px"
+  },
+  boardName: {
+    fontSize:     "15px",
+    fontWeight:   "700",
+    color:        "#111827",
+    marginBottom: "4px"
+  },
+  boardMeta: {
+    fontSize: "12px",
+    color:    "#9ca3af"
   }
 };
