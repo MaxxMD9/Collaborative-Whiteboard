@@ -10,11 +10,17 @@ import { getSocket } from "../socket";
 
 import InviteModal from "../components/InviteModal";
 
+import { useLocation } from "react-router-dom";
+
 // Routing
 import { Link, useNavigate } from "react-router-dom";
 
 
 function WhiteboardPage() {
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+  const location = useLocation();
+  
   /* CANVAS VARIABLES */
   const boardAreaRef = useRef(null);
   const canvasRef = useRef(null);
@@ -92,7 +98,7 @@ function WhiteboardPage() {
     gridEnabled: false,
     gridSize: 25,
     liveSyncEnabled: false,                                           /* ENABLE SYNC AT A LATER DATE */
-    roomName: "Main Room",
+    roomName: location.state?.roomName || "Main Room",
     showStatus: true
   });
   
@@ -101,8 +107,7 @@ function WhiteboardPage() {
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
 
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
+
 
   // Update a setting while preserving the rest
   function handleSettingChange(key, value) {
