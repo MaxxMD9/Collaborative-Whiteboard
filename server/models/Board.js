@@ -51,7 +51,13 @@ const boardSchema = new mongoose.Schema(
     background: {
       type:    String,
       default: "#ffffff"
-    }
+    },
+
+    // Users who have joined this board via invite
+    members: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: []
+    },
   },
   {
     timestamps: true

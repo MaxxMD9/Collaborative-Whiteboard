@@ -76,13 +76,18 @@ router.post("/join", requireAuth, async (req, res) => {
       await invite.save();
     }
 
-    // Make sure the board exists, create it if not
     let board = await Board.findOne({ roomName: invite.roomName });
     if (!board) {
       board = await Board.create({
         roomName: invite.roomName,
         createdBy: invite.createdBy
       });
+    }
+
+    // Add user to board members if not already there
+    if (!board.members.includes(req.user._id)) {
+      board.members.push(req.user._id);
+      await board.save();
     }
 
     res.json({ roomName: invite.roomName, board });
