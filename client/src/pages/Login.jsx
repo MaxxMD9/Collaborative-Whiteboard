@@ -21,7 +21,7 @@ export default function Login() {
 
     if (res.ok) {
       login(data.user, data.token);
-      navigate("/whiteboard");
+      navigate("/lobby");
     } else {
       alert(data.error);
     }

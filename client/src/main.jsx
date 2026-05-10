@@ -11,6 +11,7 @@ import Home           from "./pages/Home";
 import Login          from "./pages/Login";
 import Register       from "./pages/Register";
 import WhiteboardPage from "./pages/WhiteboardPage";
+import Lobby          from "./pages/Lobby";
 
 import "./App.css";
 
@@ -26,6 +27,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="/register" element={<Register />} />
 
           {/* Protected — must be logged in */}
+          <Route
+            path="/lobby"
+            element={
+              <ProtectedRoute>
+                <Lobby />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/whiteboard"
             element={

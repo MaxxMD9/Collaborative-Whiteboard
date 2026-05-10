@@ -8,6 +8,8 @@ import { useAuth } from "../context/AuthContext";
 
 import { getSocket } from "../socket";
 
+import InviteModal from "../components/InviteModal";
+
 // Routing
 import { Link, useNavigate } from "react-router-dom";
 
@@ -96,6 +98,8 @@ function WhiteboardPage() {
   
   /* ACCOUNT BUTTON VARIABLE */
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const { logout } = useAuth();
   const navigate   = useNavigate();
@@ -1257,6 +1261,13 @@ useEffect(() => {
         </nav>
 
         <button
+          className="tool-button"
+          type="button"
+          onClick={() => setIsInviteOpen(true)}>
+          Invite
+        </button>
+
+        <button
           className="settings-button"
           type="button"
           aria-label="Open settings"
@@ -1557,6 +1568,13 @@ useEffect(() => {
         settings={settings}
         onSettingChange={handleSettingChange}
       />
+
+      {isInviteOpen && (
+        <InviteModal
+          roomName={settings.roomName}
+          onClose={() => setIsInviteOpen(false)}
+        />
+      )}
     </main>
   );
 }

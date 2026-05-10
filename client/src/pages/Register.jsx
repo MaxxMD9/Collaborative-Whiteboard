@@ -19,7 +19,7 @@ export default function Register() {
     const data = await res.json();
     if (res.ok) {
       login(data.user, data.token);
-      navigate("/whiteboard");
+      navigate("/lobby");
     } else {
       alert(data.error);
     }
