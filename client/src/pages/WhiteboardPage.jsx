@@ -6,6 +6,8 @@ import "katex/dist/katex.min.css";
 import katex from "katex";
 import { useAuth } from "../context/AuthContext";
 
+import { getSocket } from "../socket";
+
 // Routing
 import { Link, useNavigate } from "react-router-dom";
 
@@ -831,6 +833,7 @@ function WhiteboardPage() {
       redoStackRef.current = [];
       currentStrokeRef.current = null;
       setStrokeCount(strokesRef.current.length);
+      getSocket()?.emit("stroke:create", finishedStroke);
       setStatus(`${strokesRef.current.length} stroke${strokesRef.current.length === 1 ? "" : "s"} on board`);
   }
 
@@ -863,7 +866,7 @@ function WhiteboardPage() {
     redrawBoard();
     setStatus("Undo complete");
     // Future sync point:
-      // socket.emit("stroke:undo");
+    getSocket()?.emit("stroke:undo");
   }
 
   // Ctrl + Y
@@ -901,8 +904,7 @@ function WhiteboardPage() {
     redrawBoard();
     setStrokeCount(0);
     setStatus("Board cleared");
-    // Future sync point:
-      // socket.emit("board:clear");
+    getSocket()?.emit("board:clear");
   }
 
   // 
@@ -946,7 +948,53 @@ useEffect(() => {
   });
 }, [equationInput?.id]);
 
+// Join the socket room when the whiteboard loads
+useEffect(() => {
+  const socket = getSocket();
+  if (!socket) return;
 
+  socket.emit("room:join", settings.roomName);
+
+  // Load existing board state from server when joining
+  socket.on("board:state", ({ strokes }) => {
+    historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
+    strokesRef.current = strokes;
+    setStrokeCount(strokes.length);
+    redrawBoard();
+  });
+
+  // Receive strokes from other users
+  socket.on("stroke:create", (stroke) => {
+    strokesRef.current.push(stroke);
+    historyRef.current.push({ kind: "stroke", value: stroke });
+    setStrokeCount(strokesRef.current.length);
+    redrawBoard();
+  });
+
+  // Someone else undid a stroke
+  socket.on("board:state", ({ strokes }) => {
+    historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
+    strokesRef.current = strokes;
+    setStrokeCount(strokes.length);
+    redrawBoard();
+  });
+
+  // Board was cleared by someone
+  socket.on("board:cleared", () => {
+    strokesRef.current = [];
+    historyRef.current = [];
+    redoStackRef.current = [];
+    setStrokeCount(0);
+    redrawBoard();
+    setStatus("Board cleared by another user");
+  });
+
+  return () => {
+    socket.off("board:state");
+    socket.off("stroke:create");
+    socket.off("board:cleared");
+  };
+}, [settings.roomName]);
 
 
   // Register keyboard shortcuts
