@@ -26,7 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Protected — must be logged in */}
+          {/* Protected - must be logged in */}
           <Route
             path="/lobby"
             element={
@@ -44,7 +44,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             }
           />
 
-          {/* Catch-all — redirect unknown URLs to home */}
+          {/* Catch all - redirect unknown URLs to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
