@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import SettingsPanel from "../components/SettingsPanel.jsx";
+import SettingsPanel from "../components/settingsPanel.jsx";
 import "./WhiteboardPage.css";
 
 import "katex/dist/katex.min.css";
