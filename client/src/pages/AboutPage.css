@@ -1,16 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Encode+Sans:wght@400;500;600&family=Red+Hat+Display:wght@400;500;600&display=swap');
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  overflow-y: auto !important;
+}
+
 .about-page {
   width: 100%;
   min-height: 100vh;
+  height: auto;
+  overflow: visible;
   background: #ffffff;
   color: #202124;
 }
-
 .about-header {
-  height: 56px;
+  height: 90px;
   display: flex;
   align-items: center;
   padding: 0 16px;
-  background: #cfe8cf;
+  background: #f0f0f0;
   border-bottom: 1px solid #d1d5db;
   position: sticky;
   top: 0;
@@ -18,8 +35,8 @@
 }
 
 .about-logo {
-  width: 120px;
-  height: 44px;
+  width: 320px;
+  height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +94,7 @@
   border-radius: 4px;
   text-decoration: none;
   font-weight: 700;
-  background: #1a73e8;
+  background: #4ba66c;
   color: #ffffff;
 }
 
@@ -86,10 +103,10 @@
   padding: 8px 16px;
   border-radius: 8px;
   background: #ffffff;
-  color: #1a73e8;
+  color: #4ba66c;
   text-decoration: none;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .signup-row {
@@ -152,6 +169,7 @@
   line-height: 1.08;
   font-weight: 500;
   margin: 0 0 24px;
+  font-family: "Encode Sans", sans-serif;
 }
 
 .hero-copy p {
@@ -162,10 +180,18 @@
 }
 
 .hero-image-panel {
-  background: #dddddd;
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+
+  background: #ffffff;
+
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: stretch;
+
   overflow: hidden;
 }
 
@@ -199,8 +225,11 @@
 
 .hero-image-slider {
   position: relative;
+
   width: 100%;
   height: 100%;
+  min-height: 520px;
+
   overflow: hidden;
 }
 
@@ -212,6 +241,9 @@
   height: 100%;
 
   object-fit: cover;
+  object-position: center;
+
+  display: block;
 
   opacity: 0;
   transform: translateX(100px);
@@ -224,4 +256,235 @@
 .hero-slide.active {
   opacity: 1;
   transform: translateX(0);
+}
+
+
+
+
+
+
+
+.showcase-section {
+  position: relative;
+  overflow: hidden;
+
+  width: 100%;
+  padding: 42px 24px 80px;
+
+  background-image: none;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+
+  border-top: 1px solid #e5e7eb;
+
+  transition:
+    background-image 0s linear 0.2s,
+    background-color 0.3s ease;
+}
+.showcase-section::before {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+}
+
+.showcase-toggle, .showcase-content {
+  position: relative;
+  z-index: 2;
+}
+
+.showcase-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 auto 40px;
+
+  border: none;
+  background: transparent;
+
+  font-family: "Manrope", sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+
+  color: #1f2937;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.22s ease,
+    opacity 0.22s ease,
+    color 0.22s ease;
+}
+
+.showcase-toggle span {
+  font-size: 24px;
+
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease;
+}
+
+
+
+.showcase-section {
+  position: relative;
+  overflow: hidden;
+
+  width: 100%;
+  padding: 42px 24px 80px;
+
+  background-image: none;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+
+  border-top: 1px solid #e5e7eb;
+
+  transition:
+    background-color 0.3s ease;
+}
+
+.showcase-section.open {
+  background-image: url("/assets/showcase_background.png");
+}
+
+.showcase-section.open .showcase-content {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+
+  max-height: 3200px;
+}
+
+.showcase-row {
+  display: grid;
+  grid-template-columns: 560px 460px;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 120px 24px;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+
+  opacity: 0;
+  transform: translateY(42px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.showcase-section.open .showcase-row {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.showcase-section.open .showcase-row:nth-child(1) {
+  transition-delay: 0.08s;
+}
+
+.showcase-section.open .showcase-row:nth-child(2) {
+  transition-delay: 0.18s;
+}
+
+.showcase-section.open .showcase-row:nth-child(3) {
+  transition-delay: 0.28s;
+}
+
+.showcase-row.reverse {
+  grid-template-columns: 460px 560px;
+}
+
+.showcase-row.reverse img {
+  order: 2;
+}
+
+.showcase-row.reverse .showcase-text {
+  order: 1;
+}
+
+.showcase-row .showcase-text {
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(249, 250, 251, 0.78) 45%,
+    rgba(243, 244, 246, 0.95) 100%
+  );
+  border-left: none;
+  border-right: 1px solid rgba(209, 213, 219, 0.75);
+  border-radius: 22px;
+
+  
+}
+
+.showcase-row.reverse .showcase-text {
+  background: linear-gradient(
+    to right,
+    rgba(243, 244, 246, 0.95) 0%,
+    rgba(248, 249, 250, 0.72) 52%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border-left: 1px solid rgba(209, 213, 219, 0.75);
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 22px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+
+.showcase-row img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: none;
+  background: transparent;
+  display: block;
+}
+
+.showcase-text {
+  width: 460px;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 36px;
+}
+
+.showcase-text h2 {
+  margin: 0 0 12px;
+  font-size: 60px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.showcase-text p {
+  margin: 0;
+  max-width: 360px;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 24px;
+  line-height: 1.45;
+  color: #4b5563;
+}
+
+
+@keyframes showcaseFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

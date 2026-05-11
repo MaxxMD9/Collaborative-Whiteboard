@@ -31,6 +31,8 @@ html, body, #root {
   font-size: 18px;
   letter-spacing: 0.2px;
   white-space: nowrap;
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 
 .board-area {
@@ -52,6 +54,7 @@ canvas {
 .control-group {
   display: flex;
   align-items: center;
+  padding-bottom: 5px;
   gap: 7px;
   font-size: 13px;
   font-weight: 700;
@@ -65,7 +68,7 @@ input[type="color"] {
   border: 1px solid #333333;
   border-radius: 8px;
   padding: 2px;
-  background: #171717;
+  background: #3f3f46;
   cursor: pointer;
 }
 
@@ -104,11 +107,13 @@ input[type="range"] {
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .tool-button {
   border: 1px solid #333333;
-  background: #171717;
+  background: #3f3f46;
   color: #ffffff;
   padding: 8px 13px;
   border-radius: 10px;
@@ -123,9 +128,14 @@ input[type="range"] {
   border-color: #ffffff;
 }
 
+.tool-button.active:hover {
+  background: #ffffff;
+  color: #050505;
+  border-color: #ffffff;
+}
+
 .tool-button:not(.active):hover {
-  background: #252525;
-  transform: translateY(-1px);
+  background: #3f3f46;
 }
 
 .tool-button.danger:hover {
@@ -136,14 +146,16 @@ input[type="range"] {
 
 .top-header {
   width: 100%;
-  min-height: 64px;
-  background: #050505;
+  min-height: 86px;
+  background: #303035;
   color: #ffffff;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-rows: auto auto;
   align-items: center;
-  gap: 24px;
-  padding: 10px 18px;
-  border-bottom: 1px solid #222222;
+  gap: 6px 24px;
+  padding: 8px 18px;
+  border-bottom: 1px solid #3f3f46;
   z-index: 10;
 }
 
@@ -181,6 +193,9 @@ SETTINGS -----------------------------------------------------------------------
   line-height: 1;
   cursor: pointer;
   transition: 0.15s ease;
+
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .settings-button:hover {
@@ -259,6 +274,18 @@ SETTINGS -----------------------------------------------------------------------
 
 .settings-footer-button:hover {
   background: #e5e7eb;
+}
+
+.settings-footer-button.settings-danger-button {
+  background: #dc2626;
+  border: 1px solid #b91c1c;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.settings-footer-button.settings-danger-button:hover {
+  background: #b91c1c;
+  border-color: #991b1b;
 }
 
 .settings-label, .settings-control {
@@ -394,6 +421,7 @@ IMAGE USAGE --------------------------------------------------------------------
 
 
 
+
 /*
 Cursor CSS is down here. -------------------------------------------------------------------------------------
 */
@@ -452,8 +480,6 @@ Cursor CSS is down here. -------------------------------------------------------
   pointer-events: none;
 }
 
-
-
 .tool-options-group {
   display: flex;
   align-items: center;
@@ -464,11 +490,29 @@ Cursor CSS is down here. -------------------------------------------------------
   height: 36px;
   border: 1px solid #333333;
   border-radius: 9px;
-  background: #171717;
+  background: #3f3f46;
   color: #ffffff;
   font-weight: 700;
   padding: 0 8px;
   cursor: pointer;
+}
+
+.tool-options-group,
+.control-group {
+  animation: toolbarOptionsExpand 0.18s ease-out;
+  transform-origin: left center;
+}
+
+@keyframes toolbarOptionsExpand {
+  from {
+    opacity: 0;
+    transform: scaleX(0.75);
+  }
+
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
 }
 
 .permanent-textbox {
@@ -493,6 +537,8 @@ Cursor CSS is down here. -------------------------------------------------------
 
 .account-menu-wrapper {
   position: relative;
+  grid-column: 4;
+  grid-row: 1;
 }
 
 .account-button {
@@ -581,6 +627,16 @@ Cursor CSS is down here. -------------------------------------------------------
   gap: 0.75rem;
 }
 
+.toolbar-second-row {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 4px;
+  gap: 15px;
+}
+
 .cursor-size-preview {
   position: absolute;
   pointer-events: none;
@@ -588,4 +644,101 @@ Cursor CSS is down here. -------------------------------------------------------
   border-radius: 999px;
   transform: translate(-50%, -50%);
   z-index: 25;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.whiteboard-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+}
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  z-index: 20;
+}
+
+.overlay-layer .whiteboard-image-wrapper {
+  pointer-events: auto;
+}
+
+.overlay-layer .permanent-textbox,
+.overlay-layer .equation-box,
+.overlay-layer .whiteboard-image-wrapper {
+  pointer-events: auto;
+}
+
+.whiteboard-image-wrapper {
+  position: absolute;
+  z-index: 20;
+  border: 1px dashed transparent;
+  user-select: none;
+  pointer-events: auto;
+}
+
+
+.whiteboard-image.selected {
+  border-color: #2563eb;
+}
+
+.whiteboard-image:hover {
+  cursor: url("/assets/cursors/move_cursor.png") 12 12, grab;
+}
+
+.image-resize-handle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  background: #2563eb;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: nwse-resize;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.whiteboard-image-wrapper.selected {
+  border: 2px dashed #2563eb;
+}
+
+.whiteboard-image-wrapper.image-move-disabled {
+  pointer-events: none;
+}
+
+.whiteboard-image-wrapper.image-move-enabled {
+  pointer-events: auto;
+}
+
+.whiteboard-image-wrapper.image-move-disabled .whiteboard-image {
+  pointer-events: none;
+}
+
+.whiteboard-image-wrapper.image-move-enabled .whiteboard-image {
+  pointer-events: none;
 }

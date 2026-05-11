@@ -10,6 +10,7 @@ function AboutPage() {
     "/assets/slideshow_image_3.png"
   ];
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [isShowcaseOpen, setIsShowcaseOpen] = useState(false);
 
   useEffect(() => {
   const interval = setInterval(() => {
@@ -28,12 +29,7 @@ function AboutPage() {
           <img src="/assets/logo_image.png" alt="Whiteboard logo" />
         </div>
 
-        <nav className="about-nav">
-          <a className="active" href="#overview">Overview</a>
-          <a href="#features">Features</a>
-          <a href="#security">Security</a>
-          <a href="#pricing">Pricing</a>
-        </nav>
+
 
         <Link to="/whiteboard" className="sign-in-button">
           Sign in
@@ -43,7 +39,7 @@ function AboutPage() {
       <section id="overview" className="hero-section">
         <div className="hero-copy-panel">
           <div className="hero-copy">
-            <h1>Build your best ideas together, in Whiteboard</h1>
+            <h1>With Interboard, put the thoughts to the canvas.</h1>
             <p>
               Create, draw, type, and collaborate on a shared whiteboard from
               anywhere.
@@ -74,10 +70,44 @@ function AboutPage() {
         </div>
       </section>
 
-      <section id="features" className="features-section">
-        <p>See what you can do with Whiteboard</p>
-        <span className="down-arrow">⌄</span>
-      </section>
+      <section
+  className={`showcase-section ${isShowcaseOpen ? "open" : ""}`}
+>
+  <button
+    className="showcase-toggle"
+    type="button"
+    onClick={() => setIsShowcaseOpen(previous => !previous)}
+  >
+    See what you can do with Interboard
+    <span>{isShowcaseOpen ? "⌃" : "⌄"}</span>
+  </button>
+
+    <div className="showcase-content">
+      <div className="showcase-row">
+        <img src="/assets/showcase_1.png" alt="Plain Fun showcase" />
+        <div className="showcase-text">
+          <h2>Plain Fun</h2>
+          <p>Doodle, brainstorm, play quick games, or just draw freely with friends.</p>
+        </div>
+      </div>
+
+      <div className="showcase-row reverse">
+        <img src="/assets/showcase_2.png" alt="Planning showcase" />
+        <div className="showcase-text">
+          <h2>Planning</h2>
+          <p>Map out workflows, organize ideas, and turn messy thoughts into clear plans.</p>
+        </div>
+      </div>
+
+      <div className="showcase-row">
+        <img src="/assets/showcase_3.png" alt="Expression showcase" />
+        <div className="showcase-text">
+          <h2>Expression</h2>
+          <p>Sketch, annotate, illustrate, and visually communicate ideas your way.</p>
+        </div>
+      </div>
+    </div>
+</section>
     </main>
   );
 }

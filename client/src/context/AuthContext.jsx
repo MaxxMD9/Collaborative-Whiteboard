@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    fetch("http://localhost:3001/api/auth/me", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : Promise.reject())

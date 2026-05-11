@@ -14,7 +14,7 @@ export default function Lobby() {
 
   // Load existing boards on mount
   useEffect(() => {
-    fetch("http://localhost:3001/api/boards", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/boards`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -28,7 +28,7 @@ export default function Lobby() {
     setLoading(true);
 
     try {
-      const res  = await fetch("http://localhost:3001/api/boards", {
+      const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/boards`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,7 +58,7 @@ export default function Lobby() {
     setLoading(true);
 
     try {
-      const res  = await fetch("http://localhost:3001/api/invites/join", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/invites/join`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",

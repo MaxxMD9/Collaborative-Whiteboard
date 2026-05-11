@@ -1572,6 +1572,7 @@ useEffect(() => {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSettingChange={handleSettingChange}
+        onClearWhiteboard={() => { clearBoard(); setIsSettingsOpen(false); }}
       />
 
       {isInviteOpen && (
