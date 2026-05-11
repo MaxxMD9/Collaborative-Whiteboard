@@ -8,6 +8,7 @@ const cors       = require("cors");
 
 const authRoutes  = require("./routes/auth");
 const boardRoutes = require("./routes/boards");
+const inviteRoutes = require("./routes/invites");
 const { registerSocketHandlers } = require("./sockets/whiteboard");
 
 //  App setup 
@@ -29,6 +30,7 @@ app.use(express.json()); // Parse JSON request bodies
 //  Routes 
 app.use("/api/auth",   authRoutes);
 app.use("/api/boards", boardRoutes);
+app.use("/api/invites", inviteRoutes);
 
 // Health-check endpoint - useful for deployment platforms
 app.get("/api/health", (req, res) => {
