@@ -12,6 +12,7 @@ export default function Lobby() {
   const [error, setError]           = useState(null);
   const [loading, setLoading]       = useState(false);
   const [boards, setBoards]         = useState([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Load existing boards on mount
   useEffect(() => {
@@ -50,6 +51,24 @@ export default function Lobby() {
       setError("Could not connect to server");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDeleteBoard(roomName, boardId) {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/boards/${encodeURIComponent(roomName)}`, {
+        method:  "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setBoards(previous => previous.filter(b => b._id !== boardId));
+        setConfirmDeleteId(null);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Could not delete board");
+      }
+    } catch {
+      setError("Could not connect to server");
     }
   }
 
@@ -162,6 +181,27 @@ export default function Lobby() {
               <div className="lobby-board-meta">
                 Created by {board.createdBy?.username || "unknown"}
               </div>
+              {confirmDeleteId === board._id ? (
+                <div className="lobby-delete-confirm" onClick={e => e.stopPropagation()}>
+                  <span>Delete?</span>
+                  <button className="lobby-delete-yes" onClick={() => handleDeleteBoard(board.roomName, board._id)}>Yes</button>
+                  <button className="lobby-delete-no" onClick={() => setConfirmDeleteId(null)}>No</button>
+                </div>
+              ) : (
+                <button
+                  className="lobby-trash-button"
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (e.shiftKey) {
+                      handleDeleteBoard(board.roomName, board._id);
+                    } else {
+                      setConfirmDeleteId(board._id);
+                    }
+                  }}
+                >
+                  🗑
+                </button>
+              )}
             </div>
           ))}
         </div>
