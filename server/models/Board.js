@@ -1,32 +1,81 @@
 const mongoose = require("mongoose");
 
-// A single point in a stroke path
 const pointSchema = new mongoose.Schema(
-  {
-    x: { type: Number, required: true },
-    y: { type: Number, required: true }
-  },
-  { _id: false } // Don't create a separate _id for each point
+  { x: { type: Number, required: true }, y: { type: Number, required: true } },
+  { _id: false }
 );
 
-// One stroke = one mouse-down -> mouse-up drawing action
 const strokeSchema = new mongoose.Schema(
   {
-    id:        { type: String, required: true }, // client-generated UUID
+    id:        { type: String, required: true },
     tool:      { type: String, enum: ["pencil", "brush", "eraser"], default: "pencil" },
     color:     { type: String, required: true },
     baseColor: { type: String },
     size:      { type: Number, required: true },
     points:    { type: [pointSchema], required: true },
-    createdAt: { type: Number } // Unix timestamp from the client
+    createdAt: { type: Number }
   },
   { _id: false }
 );
 
-// A Board is a room that multiple users can draw on together
+const shapeSchema = new mongoose.Schema(
+  {
+    id:        { type: String, required: true },
+    type:      { type: String, default: "shape" },
+    shapeType: { type: String, required: true },
+    fillMode:  { type: String, default: "hollow" },
+    opacity:   { type: Number, default: 1 },
+    color:     { type: String, required: true },
+    size:      { type: Number, required: true },
+    start:     { type: { x: Number, y: Number }, required: true },
+    end:       { type: { x: Number, y: Number }, required: true },
+    createdAt: { type: Number }
+  },
+  { _id: false }
+);
+
+const textBoxSchema = new mongoose.Schema(
+  {
+    id:         { type: String, required: true },
+    x:          { type: Number, required: true },
+    y:          { type: Number, required: true },
+    value:      { type: String, default: "" },
+    color:      { type: String, required: true },
+    fontSize:   { type: Number, required: true },
+    fontFamily: { type: String, default: "Arial" },
+    createdAt:  { type: Number }
+  },
+  { _id: false }
+);
+
+const equationSchema = new mongoose.Schema(
+  {
+    id:        { type: String, required: true },
+    x:         { type: Number, required: true },
+    y:         { type: Number, required: true },
+    latex:     { type: String, required: true },
+    color:     { type: String, required: true },
+    fontSize:  { type: Number, required: true },
+    createdAt: { type: Number }
+  },
+  { _id: false }
+);
+
+const imageSchema = new mongoose.Schema(
+  {
+    id:        { type: String, required: true },
+    src:       { type: String, required: true },
+    x:         { type: Number, required: true },
+    y:         { type: Number, required: true },
+    width:     { type: Number, required: true },
+    height:    { type: Number, required: true },
+    createdAt: { type: Number }
+  },
+  { _id: false }
+);
+
 const boardSchema = new mongoose.Schema(
   {
-    // Human-readable room name (e.g. "Main Room", "CSE 108 Group")
     roomName: {
       type:      String,
       required:  true,
@@ -34,34 +83,19 @@ const boardSchema = new mongoose.Schema(
       trim:      true,
       maxlength: 50
     },
-
-    // All strokes currently on the board
-    strokes: {
-      type:    [strokeSchema],
-      default: []
-    },
-
-    // Which user created the room
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref:  "User"
-    },
-
-    // Canvas background color stored per board
-    background: {
-      type:    String,
-      default: "#ffffff"
-    },
-
-    // Users who have joined this board via invite
+    strokes:   { type: [strokeSchema],   default: [] },
+    shapes:    { type: [shapeSchema],    default: [] },
+    textBoxes: { type: [textBoxSchema],  default: [] },
+    equations: { type: [equationSchema], default: [] },
+    images:    { type: [imageSchema],    default: [] },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    background: { type: String, default: "#ffffff" },
     members: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: []
-    },
+    }
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
 module.exports = mongoose.model("Board", boardSchema);
