@@ -114,12 +114,12 @@ function registerSocketHandlers(io) {
       if (!room) return;
 
       try {
-        if (!fill?.snapshot) {
-          console.warn("[Socket] fill:create ignored: missing snapshot", fill);
-          return;
-        }
+        if (typeof fill?.x !== "number" || typeof fill?.y !== "number") {
+  console.warn("[Socket] fill:create ignored: missing coordinates", fill);
+  return;
+}
 
-        console.log("[Socket] fill:create snapshot length:", fill.snapshot.length);
+        console.log("[Socket] fill:create:", fill);
 
         const result = await Board.findOneAndUpdate(
           { roomName: room, "fills.id": { $ne: fill.id } },
