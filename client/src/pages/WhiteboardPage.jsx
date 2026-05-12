@@ -362,22 +362,7 @@ function WhiteboardPage() {
     return canvasRef.current.getContext("2d");
   }
 
-  // For re-handling fill
-  function serializeImageData(imageData) {
-    return {
-      width: imageData.width,
-      height: imageData.height,
-      data: Array.from(imageData.data)
-    };
-  }
-  // Ditto
-  function deserializeImageData(serialized) {
-    return new ImageData(
-      new Uint8ClampedArray(serialized.data),
-      serialized.width,
-      serialized.height
-    );
-  }
+  
 
   function getColorWithOpacity(hex, opacity) {
     return hexToRgba(hex, Number(opacity));
@@ -481,14 +466,17 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        if (!item.value.imageData || !item.value.imageData.data) {
-          continue;
-        }
+        const fill = item.value;
 
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.putImageData(deserializeImageData(item.value.imageData), 0, 0);
-        ctx.restore();
+        const replayX = fill.canvasWidth
+          ? fill.x * (canvas.width / fill.canvasWidth)
+          : fill.x;
+
+        const replayY = fill.canvasHeight
+          ? fill.y * (canvas.height / fill.canvasHeight)
+          : fill.y;
+
+        applyFloodFill(replayX, replayY, fill.color, fill.tolerance);
       }
     }
     if (currentStrokeRef.current) {
@@ -826,6 +814,82 @@ function WhiteboardPage() {
     return ( <div dangerouslySetInnerHTML={{ __html: html }} /> );
   }
 
+  function applyFloodFill(canvasX, canvasY, fillHex, toleranceValue) {
+    const canvas = canvasRef.current;
+    const ctx = getCanvasContext();
+
+    const x = Math.floor(canvasX);
+    const y = Math.floor(canvasY);
+
+    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) {
+      return false;
+    }
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    const startIndex = (y * canvas.width + x) * 4;
+    const targetColor = [
+      data[startIndex],
+      data[startIndex + 1],
+      data[startIndex + 2],
+      data[startIndex + 3]
+    ];
+
+    const fillColor = hexToRgbArray(fillHex);
+    const tolerance = Number(toleranceValue);
+
+    if (colorsMatch(targetColor, fillColor, tolerance)) {
+      return false;
+    }
+
+    const stack = [[x, y]];
+    const visited = new Uint8Array(canvas.width * canvas.height);
+
+    while (stack.length > 0) {
+      const [currentX, currentY] = stack.pop();
+
+      if (
+        currentX < 0 ||
+        currentY < 0 ||
+        currentX >= canvas.width ||
+        currentY >= canvas.height
+      ) {
+        continue;
+      }
+
+      const pixelIndex = currentY * canvas.width + currentX;
+
+      if (visited[pixelIndex]) continue;
+      visited[pixelIndex] = 1;
+
+      const index = pixelIndex * 4;
+      const currentColor = [
+        data[index],
+        data[index + 1],
+        data[index + 2],
+        data[index + 3]
+      ];
+
+      if (!colorsMatch(currentColor, targetColor, tolerance)) {
+        continue;
+      }
+
+      data[index] = fillColor[0];
+      data[index + 1] = fillColor[1];
+      data[index + 2] = fillColor[2];
+      data[index + 3] = fillColor[3];
+
+      stack.push([currentX + 1, currentY]);
+      stack.push([currentX - 1, currentY]);
+      stack.push([currentX, currentY + 1]);
+      stack.push([currentX, currentY - 1]);
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return true;
+  }
+
   // Determine what passes with the tolerance
   function colorsMatch(a, b, tolerance) {
     return (
@@ -839,58 +903,34 @@ function WhiteboardPage() {
   // Fills an area using the paint bucket
   function floodFill(screenX, screenY) {
     const canvas = canvasRef.current;
-    const ctx = getCanvasContext();
     const pixelRatio = window.devicePixelRatio || 1;
-    const x = Math.floor(screenX * pixelRatio);
-    const y = Math.floor(screenY * pixelRatio);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    const startIndex = (y * canvas.width + x) * 4;
-    const targetColor = [ data[startIndex], data[startIndex + 1], data[startIndex + 2], data[startIndex + 3] ];
-    const fillColor = hexToRgbArray(colorRef.current);
-    const tolerance = Number(fillTolerance);
-    if (colorsMatch(targetColor, fillColor, tolerance)) {
-      return;
-    }
-    const stack = [[x, y]];
-    const visited = new Uint8Array(canvas.width * canvas.height);
-    while (stack.length > 0) {
-      const [currentX, currentY] = stack.pop();
-      if ( currentX < 0 || currentY < 0 || currentX >= canvas.width || currentY >= canvas.height ) {
-        continue;
-      }
-      const pixelIndex = currentY * canvas.width + currentX;
-      if (visited[pixelIndex]) {
-        continue;
-      };
-      visited[pixelIndex] = 1;
-      const index = pixelIndex * 4;
-      const currentColor = [ data[index], data[index + 1], data[index + 2], data[index + 3] ];
-      if (!colorsMatch(currentColor, targetColor, tolerance)) {
-        continue;
-      }
-      data[index] = fillColor[0];
-      data[index + 1] = fillColor[1];
-      data[index + 2] = fillColor[2];
-      data[index + 3] = fillColor[3];
-      stack.push([currentX + 1, currentY]);
-      stack.push([currentX - 1, currentY]);
-      stack.push([currentX, currentY + 1]);
-      stack.push([currentX, currentY - 1]);
-    }
-    ctx.putImageData(imageData, 0, 0);
 
-    // Capture the canvas state as base64 AFTER the flood fill
+    const canvasX = Math.floor(screenX * pixelRatio);
+    const canvasY = Math.floor(screenY * pixelRatio);
+
+    const didFill = applyFloodFill(
+      canvasX,
+      canvasY,
+      colorRef.current,
+      Number(fillTolerance)
+    );
+
+    if (!didFill) return;
+
     const newFill = {
       id: crypto.randomUUID(),
-      imageData: serializeImageData(imageData),
+      x: canvasX,
+      y: canvasY,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      color: colorRef.current,
+      tolerance: Number(fillTolerance),
       createdAt: Date.now()
     };
 
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
     getSocket()?.emit("fill:create", newFill);
-    setStatus("Fill complete");
     setStatus("Fill complete");
   }
 
@@ -966,17 +1006,21 @@ function WhiteboardPage() {
       setSelectedImageId(null);
     }
 
-
+    if (item.kind === "fill") {
+      if (item.value.restored) {
+        // This is a server-restored fill — put it back, can't undo it
+        historyRef.current.push(item);
+        redoStackRef.current.pop(); // don't add to redo
+        setStatus("Cannot undo a fill from a previous session");
+        return;
+      }
+      // Session fill — already popped, redrawBoard handles it
+    }
 
     redrawBoard();
     setStatus("Undo complete");
-
     if (item.kind === "stroke") {
-      getSocket()?.emit("stroke:undo", item.value.id);
-    }
-
-    if (item.kind === "fill") {
-      getSocket()?.emit("fill:undo", item.value.id);
+      getSocket()?.emit("stroke:undo");
     }
   }
 
@@ -1156,7 +1200,8 @@ function WhiteboardPage() {
         ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },                       t: s.createdAt || 0 })),
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
-        ...safeFills.filter(f => f.imageData && f.imageData.data).map(f => ({ kind: "fill", value: f, t: f.createdAt || 0 })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
+        ...safeFills .filter(f => typeof f.x === "number" && typeof f.y === "number" && f.color).map(f => ({ kind: "fill", value: f, t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
@@ -1213,7 +1258,7 @@ function WhiteboardPage() {
 
     // Receive fills from other users (no imageData — use world-space rect fallback)
     socket.on("fill:create", (fill) => {
-      historyRef.current.push({ kind: "fill", value: { ...fill, imageData: null } });
+      historyRef.current.push({ kind: "fill", value: fill });
       redrawBoard();
     });
 
