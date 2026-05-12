@@ -112,13 +112,27 @@ function registerSocketHandlers(io) {
     socket.on("fill:create", async (fill) => {
       const room = socket.currentRoom;
       if (!room) return;
+
       try {
-        socket.to(room).emit("fill:create", fill);
-        await Board.findOneAndUpdate(
+        if (!fill?.snapshot) {
+          console.warn("[Socket] fill:create ignored: missing snapshot", fill);
+          return;
+        }
+
+        console.log("[Socket] fill:create snapshot length:", fill.snapshot.length);
+
+        const result = await Board.findOneAndUpdate(
           { roomName: room, "fills.id": { $ne: fill.id } },
-          { $push: { fills: fill } }
+          { $push: { fills: fill } },
+          { new: true }
         );
-      } catch (err) { console.error("[Socket] fill:create error:", err); }
+
+        console.log("[Socket] fill:create saved fills:", result?.fills?.length);
+
+        socket.to(room).emit("fill:create", fill);
+      } catch (err) {
+        console.error("[Socket] fill:create error:", err);
+      }
     });
 
     socket.on("image:create", async (image) => {
