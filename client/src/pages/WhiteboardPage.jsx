@@ -1145,6 +1145,7 @@ function WhiteboardPage() {
       });
 
       strokesRef.current = safeStrokes;
+      redoStackRef.current = [];
 
       // Rebuild history sorted by createdAt so elements render in the correct order
       const allItems = [

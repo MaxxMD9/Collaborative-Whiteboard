@@ -146,21 +146,11 @@ function registerSocketHandlers(io) {
       const room = socket.currentRoom;
       if (!room) return;
       try {
-        const board = await Board.findOneAndUpdate(
+        // Just remove from DB — client handles its own history/redraw
+        await Board.findOneAndUpdate(
           { roomName: room },
-          { $pop: { strokes: 1 } },
-          { new: true }
+          { $pop: { strokes: 1 } }
         );
-        if (!board) return;
-        io.to(room).emit("board:state", {
-          strokes:    board.strokes,
-          shapes:     board.shapes,
-          textBoxes:  board.textBoxes,
-          equations:  board.equations,
-          images:     board.images,
-          fills:      board.fills || [],
-          background: board.background
-        });
       } catch (err) { console.error("[Socket] stroke:undo error:", err); }
     });
 
