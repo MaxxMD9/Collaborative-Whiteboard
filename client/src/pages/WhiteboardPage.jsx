@@ -6,11 +6,19 @@ import "katex/dist/katex.min.css";
 import katex from "katex";
 import { useAuth } from "../context/AuthContext";
 
+import { getSocket } from "../socket";
+import InviteModal from "../components/InviteModal";
+import { useLocation } from "react-router-dom";
+
 // Routing
 import { Link, useNavigate } from "react-router-dom";
 
 
 function WhiteboardPage() {
+  const { logout } = useAuth();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+
   /* CANVAS VARIABLES */
   const boardAreaRef = useRef(null);
   const canvasRef = useRef(null);
@@ -67,7 +75,7 @@ function WhiteboardPage() {
   /* COLOR PANEL VARIABLES */
   const colorRef = useRef(color);
   const colorInputRef = useRef(null);
-  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);  
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
   /* EQUATIONS VARIABLES */
   const equationInputRef = useRef(null);
@@ -96,15 +104,14 @@ function WhiteboardPage() {
     gridEnabled: false,
     gridSize: 25,
     liveSyncEnabled: false,                                           /* ENABLE SYNC AT A LATER DATE */
-    roomName: "Main Room",
+    roomName: location.state?.roomName || "Main Room",
     showStatus: true
   });
   
   /* ACCOUNT BUTTON VARIABLE */
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   // Update a setting while preserving the rest
   function handleSettingChange(key, value) {
@@ -456,8 +463,25 @@ function WhiteboardPage() {
       if (item.kind === "stroke") {
         drawFullStroke(ctx, item.value);
       }
-      if (item.kind === "imageData") {
-        ctx.putImageData(item.value.imageData, 0, 0);
+      if (item.kind === "fill") {
+        if (item.value.imageData) {
+          // Local session: use pixel-accurate snapshot (fastest, no zoom artifacts)
+          ctx.restore();
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.putImageData(item.value.imageData, 0, 0);
+          ctx.restore();
+          // Re-apply camera transform for subsequent items
+          ctx.save();
+          ctx.translate(camera.x, camera.y);
+          ctx.scale(camera.zoom, camera.zoom);
+        } else {
+          // Restored from server: use world-space rect (no imageData available)
+          ctx.save();
+          ctx.fillStyle = item.value.color;
+          ctx.fillRect(-100000, -100000, 200000, 200000);
+          ctx.restore();
+        }
       }
     }
     if (currentStrokeRef.current) {
@@ -600,6 +624,11 @@ function WhiteboardPage() {
       setSelectedEquationId(newEquation.id);
       historyRef.current.push({ kind: "equation", value: newEquation });
       redoStackRef.current = [];
+      if (equationInput.editingExisting) {
+        getSocket()?.emit("equation:update", newEquation);
+      } else {
+        getSocket()?.emit("equation:create", newEquation);
+      }
     }
     setEquationInput(null);
     requestAnimationFrame(() => { equationSaveLockRef.current = false; });
@@ -637,13 +666,14 @@ function WhiteboardPage() {
     setSelectedEquationId(null);
 
     if (tool === "text") {
-      const newTextBox = { id: crypto.randomUUID(), x: point.x, y: point.y, screenX: screenPoint.x, screenY: screenPoint.y, value: "", color, fontSize: size * 4, fontFamily: textFont };
+      const newTextBox = { id: crypto.randomUUID(), x: point.x, y: point.y, screenX: screenPoint.x, screenY: screenPoint.y, value: "", color, fontSize: textSize, fontFamily: textFont };
       setTextBoxes(previous => [...previous, newTextBox]);
       setSelectedTextBoxId(newTextBox.id);
       setSelectedObjectId(null);
       setStatus("Textbox created");
       historyRef.current.push({ kind: "textbox", value: newTextBox});
       redoStackRef.current = [];
+      getSocket()?.emit("textbox:create", newTextBox);
       return;
     }
 
@@ -842,55 +872,58 @@ function WhiteboardPage() {
       stack.push([currentX, currentY - 1]);
     }
     ctx.putImageData(imageData, 0, 0);
-    const fillSnapshot = {
-      id: crypto.randomUUID(),
-      imageData
-    };
 
-    historyRef.current.push({
-      kind: "imageData",
-      value: fillSnapshot
-    });
+    // Store imageData for local undo/redo (pixel-accurate), and color for socket/persistence
+    const newFill = {
+      id: crypto.randomUUID(),
+      imageData,                      // local only — not sent over socket
+      color: colorRef.current,        // persisted and synced
+      createdAt: Date.now()
+    };
+    historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
+    getSocket()?.emit("fill:create", { id: newFill.id, color: newFill.color, createdAt: newFill.createdAt });
     setStatus("Fill complete");
   }
 
   // Finishes current stroke / camera movement while cursor is movement
   /* THIS NEEDS TO BE UPDATED AT A LATER DATE -------------------------------------------------------------------------------------------------------------- */
-    function stopDrawing() {
-      selectedObjectRef.current = null;
-      if (isPanningRef.current) {
-        isPanningRef.current = false;
-        setStatus("Move complete");
-        return;
-      }
+  function stopDrawing() {
+    selectedObjectRef.current = null;
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      setStatus("Move complete");
+      return;
+    }
 
-      if (!isDrawingRef.current) return;
+    if (!isDrawingRef.current) return;
 
-      if (tool === "shape" && activeShapeRef.current) {
-        const finishedShape = activeShapeRef.current;
-        const shapeStroke = {
-          ...finishedShape,
-          kind: "shape"
-        };
-        strokesRef.current.push(shapeStroke);
-        historyRef.current.push({ kind: "stroke", value: shapeStroke });
-        activeShapeRef.current = null;
-        redoStackRef.current = [];
-        isDrawingRef.current = false;
-        redrawBoard();
-        setStatus(`${shapeType} placed`);
-        return;
-      }
-      isDrawingRef.current = false;
-      if (!currentStrokeRef.current) return;
-      const finishedStroke = currentStrokeRef.current;
-      strokesRef.current.push(finishedStroke);
-      historyRef.current.push({ kind: "stroke", value: finishedStroke });
+    if (tool === "shape" && activeShapeRef.current) {
+      const finishedShape = activeShapeRef.current;
+      const shapeStroke = {
+        ...finishedShape,
+        kind: "shape"
+      };
+      strokesRef.current.push(shapeStroke);
+      historyRef.current.push({ kind: "stroke", value: shapeStroke });
+      activeShapeRef.current = null;
       redoStackRef.current = [];
-      currentStrokeRef.current = null;
-      setStrokeCount(strokesRef.current.length);
-      setStatus(`${strokesRef.current.length} stroke${strokesRef.current.length === 1 ? "" : "s"} on board`);
+      isDrawingRef.current = false;
+      redrawBoard();
+      getSocket()?.emit("shape:create", finishedShape);
+      setStatus(`${shapeType} placed`);
+      return;
+    }
+    isDrawingRef.current = false;
+    if (!currentStrokeRef.current) return;
+    const finishedStroke = currentStrokeRef.current;
+    strokesRef.current.push(finishedStroke);
+    historyRef.current.push({ kind: "stroke", value: finishedStroke });
+    redoStackRef.current = [];
+    currentStrokeRef.current = null;
+    setStrokeCount(strokesRef.current.length);
+    getSocket()?.emit("stroke:create", finishedStroke);
+    setStatus(`${strokesRef.current.length} stroke${strokesRef.current.length === 1 ? "" : "s"} on board`);
   }
 
   // Ctrl + Z
@@ -899,30 +932,39 @@ function WhiteboardPage() {
     if (historyRef.current.length === 0) return;
     const item = historyRef.current.pop();
     redoStackRef.current.push(item);
+
     if (item.kind === "stroke") {
       strokesRef.current = strokesRef.current.filter(stroke => stroke.id !== item.value.id);
       setStrokeCount(strokesRef.current.length);
     }
+
     if (item.kind === "object") {
       objectsRef.current = objectsRef.current.filter(object => object.id !== item.value.id);
       setSelectedObjectId(null);
     }
+
     if (item.kind === "textbox") {
       setTextBoxes(previous => previous.filter(textBox => textBox.id !== item.value.id));
       setSelectedTextBoxId(null);
     }
+
     if (item.kind === "equation") {
       setEquations(previous => previous.filter(equation => equation.id !== item.value.id));
       setSelectedEquationId(null);
     }
+
     if (item.kind === "image") {
       setImages(previous => previous.filter(image => image.id !== item.value.id));
       setSelectedImageId(null);
     }
+
+    if (item.kind === "fill") {
+      // fill is already popped from historyRef — redrawBoard replays history correctly
+    }
+
     redrawBoard();
     setStatus("Undo complete");
-    // Future sync point:
-      // socket.emit("stroke:undo");
+    getSocket()?.emit("stroke:undo");
   }
 
   // Ctrl + Y
@@ -949,6 +991,9 @@ function WhiteboardPage() {
     if (item.kind === "image") {
       setImages(previous => [...previous, item.value]);
     }
+    if (item.kind === "fill") {
+      // fill is already pushed back to historyRef — redrawBoard replays correctly
+    }
     redrawBoard();
     setStatus("Redo complete");
     // Future sync point:
@@ -963,11 +1008,13 @@ function WhiteboardPage() {
     historyRef.current = [];
     redoStackRef.current = [];
     activeShapeRef.current = null;
+    setTextBoxes([]);
+    setEquations([]);
+    setImages([]);
     redrawBoard();
     setStrokeCount(0);
     setStatus("Board cleared");
-    // Future sync point:
-      // socket.emit("board:clear");
+    getSocket()?.emit("board:clear");
   }
 
   // 
@@ -985,30 +1032,35 @@ function WhiteboardPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Src = e.target.result;
 
-    const newImage = {
-      id: crypto.randomUUID(),
-      src: imageUrl,
-      x: 100,
-      y: 100,
-      width: 240,
-      height: 160
+      const newImage = {
+        id: crypto.randomUUID(),
+        src: base64Src,
+        x: 100,
+        y: 100,
+        width: 240,
+        height: 160,
+        createdAt: Date.now()
+      };
+
+      setImages(previous => [...previous, newImage]);
+      historyRef.current.push({ kind: "image", value: newImage });
+      redoStackRef.current = [];
+      setSelectedImageId(newImage.id);
+      setTool("move");
+      setStatus("Image added");
+      getSocket()?.emit("image:create", newImage);
     };
-
-    setImages(previous => [...previous, newImage]);
-    historyRef.current.push({ kind: "image", value: newImage });
-    redoStackRef.current = [];
-    setSelectedImageId(newImage.id);
-    setTool("move");
-    setStatus("Image added");
+    reader.readAsDataURL(file);
     event.target.value = "";
   }
 
-  // Change colors 
+  // Change colors
   function handleColorChange(event) {
     const nextColor = event.target.value;
-
     colorRef.current = nextColor;
     setColor(nextColor);
 
@@ -1020,7 +1072,6 @@ function WhiteboardPage() {
             : textBox
         )
       );
-
       setStatus("Textbox color changed");
       return;
     }
@@ -1033,7 +1084,6 @@ function WhiteboardPage() {
             : equation
         )
       );
-
       setStatus("Equation color changed");
       return;
     }
@@ -1053,9 +1103,6 @@ function WhiteboardPage() {
     redrawBoard();
   }, [settings.canvasBackground, settings.gridEnabled, settings.gridSize, selectedObjectId]);
 
-
-
-
   useEffect(() => {
     if (!equationInput) return;
 
@@ -1065,8 +1112,125 @@ function WhiteboardPage() {
     });
   }, [equationInput?.id]);
 
+  // Join the socket room when the whiteboard loads
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
 
+    socket.emit("room:join", settings.roomName);
 
+    // Load existing board state from server when joining
+    socket.on("board:state", ({ strokes, shapes, textBoxes, equations, images, fills }) => {
+      const safeStrokes   = strokes    || [];
+      const safeShapes    = shapes     || [];
+      const safeTextBoxes = textBoxes  || [];
+      const safeEquations = equations  || [];
+      const safeImages    = images     || [];
+      const safeFills     = fills      || [];
+
+      strokesRef.current = safeStrokes;
+      historyRef.current = [
+        ...safeStrokes.map(s => ({ kind: "stroke",   value: s })),
+        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" } })),
+        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t })),
+        ...safeEquations.map(e => ({ kind: "equation", value: e })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i })),
+        // fills from server have no imageData — redrawBoard uses world-space rect fallback
+        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, imageData: null } })),
+      ];
+
+      objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
+
+      setTextBoxes(safeTextBoxes);
+      setEquations(safeEquations);
+      setImages(safeImages);
+      setStrokeCount(safeStrokes.length);
+      requestAnimationFrame(() => redrawBoard());
+    });
+
+    // Receive strokes from other users
+    socket.on("stroke:create", (stroke) => {
+      strokesRef.current.push(stroke);
+      historyRef.current.push({ kind: "stroke", value: stroke });
+      setStrokeCount(strokesRef.current.length);
+      redrawBoard();
+    });
+
+    // Receive shapes from other users
+    socket.on("shape:create", (shape) => {
+      const shapeStroke = { ...shape, kind: "shape" };
+      strokesRef.current.push(shapeStroke);
+      historyRef.current.push({ kind: "stroke", value: shapeStroke });
+      redrawBoard();
+    });
+
+    // Receive textboxes from other users
+    socket.on("textbox:create", (textBox) => {
+      setTextBoxes(prev => [...prev, textBox]);
+      historyRef.current.push({ kind: "textbox", value: textBox });
+    });
+
+    // Receive textbox updates from other users
+    socket.on("textbox:update", (textBox) => {
+      setTextBoxes(prev => prev.map(t => t.id === textBox.id ? textBox : t));
+    });
+
+    // Receive equations from other users
+    socket.on("equation:create", (equation) => {
+      setEquations(prev => [...prev, equation]);
+      historyRef.current.push({ kind: "equation", value: equation });
+    });
+
+    // Receive equation updates from other users
+    socket.on("equation:update", (equation) => {
+      setEquations(prev => prev.map(e => e.id === equation.id ? equation : e));
+    });
+
+    // Receive fills from other users (no imageData — use world-space rect fallback)
+    socket.on("fill:create", (fill) => {
+      historyRef.current.push({ kind: "fill", value: { ...fill, imageData: null } });
+      redrawBoard();
+    });
+
+    // Receive images from other users
+    socket.on("image:create", (image) => {
+      setImages(prev => [...prev, image]);
+      historyRef.current.push({ kind: "image", value: image });
+    });
+
+    // Receive image updates from other users
+    socket.on("image:update", (image) => {
+      setImages(prev => prev.map(i => i.id === image.id ? image : i));
+    });
+
+    // Board was cleared by someone
+    socket.on("board:cleared", () => {
+      strokesRef.current = [];
+      objectsRef.current = [];
+      historyRef.current = [];
+      redoStackRef.current = [];
+      setTextBoxes([]);
+      setEquations([]);
+      setImages([]);
+      setStrokeCount(0);
+      redrawBoard();
+      setStatus("Board cleared by another user");
+    });
+
+    return () => {
+      socket.off("board:state");
+      socket.off("stroke:create");
+      socket.off("shape:create");
+      socket.off("textbox:create");
+      socket.off("textbox:update");
+      socket.off("equation:create");
+      socket.off("equation:update");
+      socket.off("fill:create");
+      socket.off("image:create");
+      socket.off("image:update");
+      socket.off("board:cleared");
+    };
+  }, [settings.roomName]);
 
   // Register keyboard shortcuts
   useEffect(() => {
@@ -1076,15 +1240,15 @@ function WhiteboardPage() {
         targetTag === "input" ||
         targetTag === "textarea" ||
         targetTag === "select";
-        
-        const key = event.key.toLowerCase();
-        if ((key === "delete" || key === "backspace") && tool === "move") {
+
+      const key = event.key.toLowerCase();
+
+      if ((key === "delete" || key === "backspace") && tool === "move") {
         // Delete selected textbox
         if (selectedTextBoxId) {
           setTextBoxes(previous =>
             previous.filter(textBox => textBox.id !== selectedTextBoxId)
           );
-
           setSelectedTextBoxId(null);
           setStatus("Textbox deleted");
           return;
@@ -1095,7 +1259,6 @@ function WhiteboardPage() {
           setEquations(previous =>
             previous.filter(equation => equation.id !== selectedEquationId)
           );
-
           setSelectedEquationId(null);
           setStatus("Equation deleted");
           return;
@@ -1105,7 +1268,6 @@ function WhiteboardPage() {
           setImages(previous =>
             previous.filter(image => image.id !== selectedImageId)
           );
-
           setSelectedImageId(null);
           setStatus("Image deleted");
           return;
@@ -1120,7 +1282,6 @@ function WhiteboardPage() {
         return;
       }
 
-      
       if (event.ctrlKey && key === "z") {
         event.preventDefault();
         undoStroke();
@@ -1153,20 +1314,10 @@ function WhiteboardPage() {
     };
   }, [tool, color, size, settings, selectedTextBoxId, selectedEquationId, selectedImageId, equationInput]);
 
-
-
-
-
-
-
-
-
-
-
   return (
     <main className="app">
       <header className="top-header">
-        <div className="brand">Whiteboard</div>
+        <Link to="/lobby" className="brand" style={{ color: "#ffffff", textDecoration: "none" }}>Whiteboard</Link>
 
         <nav className="toolbar" aria-label="Whiteboard tools">
           
@@ -1222,7 +1373,6 @@ function WhiteboardPage() {
             <img src="/assets/eraser.png" alt="" />
             <span>Eraser</span>
           </button>
-
 
           <button
             className={`tool-button image-tool-button ${tool === "text" ? "active" : ""}`}
@@ -1314,7 +1464,7 @@ function WhiteboardPage() {
             style={{ display: "none" }}
             onChange={handleImageUpload}
           />
-        
+
           <button
             className="tool-button image-tool-button"
             type="button"
@@ -1329,41 +1479,42 @@ function WhiteboardPage() {
             className="tool-button image-tool-button"
             type="button"
             onClick={redoStroke}
-            title="Undo (Ctrl + Z)"
-            aria-label="Undo">
+            title="Redo (Ctrl + Y)"
+            aria-label="Redo">
             <img src="/assets/redo.png" alt="" />
             <span>Redo</span>
           </button>
 
-        
-        </nav>
-        <div className="toolbar-second-row">
-          <label className="control-group">
-            Color
+          <button className="tool-button danger" type="button" onClick={clearBoard}>
+            Clear
+          </button>
 
-            <button
-              type="button"
-              className="color-preview-button"
-              style={{ backgroundColor: color }}
+          <div className="toolbar-right-controls">
+            <label className="control-group">
+              Color
+              <button
+                type="button"
+                className="color-preview-button"
+                style={{ backgroundColor: color }}
                 onClick={() => {
-                if (isColorPickerOpen) {
-                  colorInputRef.current.blur();
-                  setIsColorPickerOpen(false);
-                  return;
-                }
-                setIsColorPickerOpen(true);
-                colorInputRef.current.click();
-              }}
-            />
-          <input
-            ref={colorInputRef}
-            type="color"
-            value={color}
-            className="hidden-color-input"
-            onChange={handleColorChange}
-            onBlur={() => setIsColorPickerOpen(false)}
-          />
-          </label>
+                  if (isColorPickerOpen) {
+                    colorInputRef.current.blur();
+                    setIsColorPickerOpen(false);
+                    return;
+                  }
+                  setIsColorPickerOpen(true);
+                  colorInputRef.current.click();
+                }}
+              />
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={color}
+                className="hidden-color-input"
+                onChange={handleColorChange}
+                onBlur={() => setIsColorPickerOpen(false)}
+              />
+            </label>
             <label className="control-group">
               Size
               <input
@@ -1373,9 +1524,17 @@ function WhiteboardPage() {
                 value={size}
                 onChange={event => setSize(Number(event.target.value))}
               />
-            <span className="size-value">{size}px</span>
-          </label>
-        </div>
+              <span className="size-value">{size}px</span>
+            </label>
+          </div>
+        </nav>
+
+        <button
+          className="tool-button"
+          type="button"
+          onClick={() => setIsInviteOpen(true)}>
+          Invite
+        </button>
 
         <button
           className="settings-button"
@@ -1407,7 +1566,7 @@ function WhiteboardPage() {
             </div>
           )}
         </div>
-        </header>
+      </header>
 
       <section ref={boardAreaRef} className="board-area">
         <canvas
@@ -1491,6 +1650,10 @@ function WhiteboardPage() {
               );
             }}
             onPointerUp={() => {
+              if (movingImageIdRef.current) {
+                const moved = images.find(i => i.id === movingImageIdRef.current);
+                if (moved) getSocket()?.emit("image:update", moved);
+              }
               movingImageIdRef.current = null;
             }}
             onPointerCancel={() => {
@@ -1537,6 +1700,10 @@ function WhiteboardPage() {
                     );
                   }}
                   onPointerUp={() => {
+                    if (resizingImageIdRef.current) {
+                      const resized = images.find(i => i.id === resizingImageIdRef.current);
+                      if (resized) getSocket()?.emit("image:update", resized);
+                    }
                     resizingImageIdRef.current = null;
                     imageResizeStartRef.current = null;
                   }}
@@ -1547,11 +1714,9 @@ function WhiteboardPage() {
 
           {textBoxes.map(textBox => {
           cameraVersion;
-          const camera = cameraRef.current;
           const isSelected = selectedTextBoxId === textBox.id;
           return (
             <textarea
-            
               key={textBox.id}
               className={`permanent-textbox ${isSelected ? "selected" : ""} ${tool === "move" ? "move-mode" : ""}`}
               style={{
@@ -1603,6 +1768,8 @@ function WhiteboardPage() {
                 const nextValue = textarea.value;
                 setTextBoxes(previous => previous.map(item => item.id === textBox.id ? { ...item, value: nextValue } : item));
                 resizeTextArea(textarea);
+                const updated = { ...textBox, value: nextValue };
+                getSocket()?.emit("textbox:update", updated);
               }}
               onKeyDown={event => {
                 if (event.key === "Escape") {
@@ -1628,9 +1795,9 @@ function WhiteboardPage() {
             />
           );
         })}
-        {equations.map(equation => {
+
+          {equations.map(equation => {
           cameraVersion;
-          const camera = cameraRef.current;
 
           return (
             <div
@@ -1781,11 +1948,6 @@ function WhiteboardPage() {
         )}
         </div>
 
-        
-
-        
-       
-
         {settings.showStatus && ( <div className="status"> {status} · {strokeCount} total </div> )}
       </section>
 
@@ -1794,8 +1956,15 @@ function WhiteboardPage() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSettingChange={handleSettingChange}
-        onClearWhiteboard={clearBoard}
+        onClearWhiteboard={() => { clearBoard(); setIsSettingsOpen(false); }}
       />
+
+      {isInviteOpen && (
+        <InviteModal
+          roomName={settings.roomName}
+          onClose={() => setIsInviteOpen(false)}
+        />
+      )}
     </main>
   );
 }
