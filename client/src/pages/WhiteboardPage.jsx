@@ -464,9 +464,21 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        // Always use world-space rect — works for both local and restored fills
-        ctx.fillStyle = item.value.color;
-        ctx.fillRect(-100000, -100000, 200000, 200000);
+        if (item.value.cachedImage) {
+          // Draw pre-cached image outside camera transform
+          ctx.restore();
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(item.value.cachedImage, 0, 0);
+          ctx.restore();
+          ctx.save();
+          ctx.translate(camera.x, camera.y);
+          ctx.scale(camera.zoom, camera.zoom);
+        } else {
+          // Restored from server (no snapshot): best effort world-space rect
+          ctx.fillStyle = item.value.color;
+          ctx.fillRect(-100000, -100000, 200000, 200000);
+        }
       }
     }
     if (currentStrokeRef.current) {
@@ -858,10 +870,28 @@ function WhiteboardPage() {
     }
     ctx.putImageData(imageData, 0, 0);
 
-    const newFill = { id: crypto.randomUUID(), color: colorRef.current, createdAt: Date.now() };
+    // Capture the canvas state as base64 AFTER the flood fill
+    // Also store camera state so we can restore it correctly
+    const canvas = canvasRef.current;
+    const camera = cameraRef.current;
+    const snapshot = canvas.toDataURL("image/png");
+    const newFill = {
+      id: crypto.randomUUID(),
+      snapshot,                        // base64 PNG — used for local replay
+      snapshotCamera: { ...camera },   // camera state at time of fill
+      color: colorRef.current,
+      createdAt: Date.now()
+    };
+    // Pre-cache as an Image element for synchronous drawing in redrawBoard
+    const cachedImage = new Image();
+    cachedImage.onload = () => redrawBoard();
+    cachedImage.src = snapshot;
+    newFill.cachedImage = cachedImage;
+
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    getSocket()?.emit("fill:create", newFill);
+    // Only send color to server (snapshot too large)
+    getSocket()?.emit("fill:create", { id: newFill.id, color: newFill.color, createdAt: newFill.createdAt });
     setStatus("Fill complete");
   }
 
