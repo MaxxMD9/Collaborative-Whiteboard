@@ -1,0 +1,223 @@
+@import url('https://fonts.googleapis.com/css2?family=Encode+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Red+Hat+Display:wght@400;500;600;700&display=swap');
+
+.lobby-page {
+  min-height: 100vh;
+  background:
+    url("/assets/lobby_background.png");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+  color: #202124;
+  font-family: "Encode Sans", sans-serif;
+}
+
+.lobby-header {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  background: #f0f0f0;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.lobby-logo {
+  height: 78px;
+  object-fit: contain;
+}
+
+.lobby-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.lobby-username {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.lobby-signout-button {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4ba66c;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lobby-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 90px 32px;
+}
+
+.lobby-title {
+  margin: 0 0 12px;
+  font-size: clamp(42px, 5vw, 64px);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #202124;
+}
+
+.lobby-subtitle {
+  margin: 0 0 48px;
+  max-width: 560px;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 20px;
+  line-height: 1.5;
+  color: #5f6368;
+}
+
+.lobby-error {
+  margin: 0 0 24px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lobby-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.lobby-card {
+  min-height: 250px;
+  padding: 34px;
+  border-radius: 24px;
+  background: linear-gradient(
+    to right,
+    rgba(243, 244, 246, 0.95) 0%,
+    rgba(248, 249, 250, 0.72) 52%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border-left: 1px solid rgba(209, 213, 219, 0.75);
+}
+
+.lobby-card-reverse {
+    min-height: 250px;
+    padding: 34px;
+    border-radius: 24px;
+    background: linear-gradient(
+    to left,
+        rgba(243, 244, 246, 0.95) 0%,
+        rgba(248, 249, 250, 0.72) 52%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    border-right: 1px solid rgba(209, 213, 219, 0.75);
+}
+
+.lobby-card-title {
+  margin: 0 0 12px;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.lobby-card-description {
+  margin: 0 0 24px;
+  font-family: "Red Hat Display", sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.lobby-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lobby-input {
+  padding: 13px 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-family: "Inter", sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+}
+
+.lobby-input:focus {
+  border-color: #4ba66c;
+}
+
+.lobby-primary-button {
+  padding: 13px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #4ba66c;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lobby-boards-section {
+  margin-top: 56px;
+}
+
+.lobby-boards-title {
+  margin: 0 0 18px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.lobby-boards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.lobby-board-card {
+  padding: 22px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.lobby-board-icon {
+  font-size: 34px;
+  margin-bottom: 10px;
+}
+
+.lobby-board-name {
+  margin-bottom: 5px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.lobby-board-meta {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+@media (max-width: 760px) {
+  .lobby-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .lobby-header {
+    padding: 0 18px;
+  }
+
+  .lobby-logo {
+    height: 64px;
+  }
+}
