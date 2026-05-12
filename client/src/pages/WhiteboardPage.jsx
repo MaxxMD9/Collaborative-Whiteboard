@@ -30,7 +30,6 @@ function WhiteboardPage() {
   const objectsRef = useRef([]);
   const strokesRef = useRef([]);
   const historyRef = useRef([]);
-  const restoredFillsRef = useRef([]); // fills from server — rendered but not in undo history
   
   /* TOOL VARIABLES */
   const [tool, setTool]                     = useState("pencil");
@@ -459,12 +458,6 @@ function WhiteboardPage() {
     ctx.scale(camera.zoom, camera.zoom);
 
     drawGrid(ctx, rect.width / camera.zoom, rect.height / camera.zoom);
-
-    // Render server-restored fills first (these are background fills not in undo history)
-    for (const fill of restoredFillsRef.current) {
-      ctx.fillStyle = fill.color;
-      ctx.fillRect(-100000, -100000, 200000, 200000);
-    }
 
     for (const item of historyRef.current) {
       if (item.kind === "stroke") {
@@ -973,12 +966,18 @@ function WhiteboardPage() {
     }
 
     if (item.kind === "fill") {
-      // fill is already popped from historyRef — redrawBoard replays history correctly
+      if (item.value.restored) {
+        // This is a server-restored fill — put it back, can't undo it
+        historyRef.current.push(item);
+        redoStackRef.current.pop(); // don't add to redo
+        setStatus("Cannot undo a fill from a previous session");
+        return;
+      }
+      // Session fill — already popped, redrawBoard handles it
     }
 
     redrawBoard();
     setStatus("Undo complete");
-    // Only sync stroke undos with the server — fills, textboxes etc. are managed client-side
     if (item.kind === "stroke") {
       getSocket()?.emit("stroke:undo");
     }
@@ -1024,7 +1023,6 @@ function WhiteboardPage() {
     objectsRef.current = [];
     historyRef.current = [];
     redoStackRef.current = [];
-    restoredFillsRef.current = [];
     activeShapeRef.current = null;
     setTextBoxes([]);
     setEquations([]);
@@ -1157,17 +1155,18 @@ function WhiteboardPage() {
 
       // Rebuild history sorted by createdAt so elements render in the correct order
       const allItems = [
-        ...safeStrokes.map(s => ({ kind: "stroke",   value: s,                          t: s.createdAt || 0 })),
-        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },    t: s.createdAt || 0 })),
-        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                          t: t.createdAt || 0 })),
-        ...safeEquations.map(e => ({ kind: "equation", value: e,                         t: e.createdAt || 0 })),
-        ...safeImages.map(i  => ({ kind: "image",    value: i,                           t: i.createdAt || 0 })),
+        ...safeStrokes.map(s => ({ kind: "stroke",   value: s,                                              t: s.createdAt || 0 })),
+        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },                       t: s.createdAt || 0 })),
+        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
+        ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
+        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, restored: true },                      t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
 
-      // Store restored fills separately — rendered but NOT in undo history
-      restoredFillsRef.current = safeFills.map(f => ({ ...f, imageData: null }));
+      // Restored fills are in history but marked so undo skips them
+      // They render correctly but can't be undone (no pixel data available)
 
       objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
 
@@ -1239,7 +1238,6 @@ function WhiteboardPage() {
       objectsRef.current = [];
       historyRef.current = [];
       redoStackRef.current = [];
-      restoredFillsRef.current = [];
       setTextBoxes([]);
       setEquations([]);
       setImages([]);
