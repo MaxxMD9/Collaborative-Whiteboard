@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Lobby.css";
 
@@ -105,7 +105,13 @@ export default function Lobby() {
   return (
     <div className="lobby-page">
   <header className="lobby-header">
-    <img src="/assets/logo_image.png" alt="Interboard logo" className="lobby-logo" />
+    <Link to="/AboutPage">
+      <img
+        src="/assets/logo_image.png"
+        alt="Interboard logo"
+        className="lobby-logo"
+      />
+    </Link>
 
     <div className="lobby-header-right">
       <span className="lobby-username">Hi, {user?.username}</span>
