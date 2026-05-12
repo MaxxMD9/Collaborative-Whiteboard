@@ -362,6 +362,17 @@ function WhiteboardPage() {
     return canvasRef.current.getContext("2d");
   }
 
+  function ensureFillImage(fill) {
+    if (!fill || !fill.snapshot) return null;
+    if (fill.cachedImage) return fill.cachedImage;
+
+    const image = new Image();
+    image.onload = () => redrawBoard();
+    image.src = fill.snapshot;
+    fill.cachedImage = image;
+    return image;
+  }
+
   function getColorWithOpacity(hex, opacity) {
     return hexToRgba(hex, Number(opacity));
   }
@@ -464,20 +475,18 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        if (item.value.cachedImage) {
-          // Draw pre-cached image outside camera transform
+        const fillImage = ensureFillImage(item.value);
+
+        if (fillImage && fillImage.complete) {
+          // Fill snapshots are full-canvas bitmap states, so draw them in screen/canvas space.
           ctx.restore();
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.drawImage(item.value.cachedImage, 0, 0);
+          ctx.drawImage(fillImage, 0, 0);
           ctx.restore();
           ctx.save();
           ctx.translate(camera.x, camera.y);
           ctx.scale(camera.zoom, camera.zoom);
-        } else {
-          // Restored from server (no snapshot): best effort world-space rect
-          ctx.fillStyle = item.value.color;
-          ctx.fillRect(-100000, -100000, 200000, 200000);
         }
       }
     }
@@ -888,8 +897,12 @@ function WhiteboardPage() {
 
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    // Only send color to server (snapshot too large)
-    getSocket()?.emit("fill:create", { id: newFill.id, color: newFill.color, createdAt: newFill.createdAt });
+    getSocket()?.emit("fill:create", {
+      id: newFill.id,
+      snapshot: newFill.snapshot,
+      color: newFill.color,
+      createdAt: newFill.createdAt
+    });
     setStatus("Fill complete");
   }
 
@@ -1160,7 +1173,9 @@ function WhiteboardPage() {
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
         ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
-        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, restored: true },                      t: f.createdAt || 0 })),
+        ...safeFills
+          .filter(f => f.snapshot)
+          .map(f => ({ kind: "fill", value: { ...f, restored: true }, t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
@@ -1215,9 +1230,10 @@ function WhiteboardPage() {
       setEquations(prev => prev.map(e => e.id === equation.id ? equation : e));
     });
 
-    // Receive fills from other users (no imageData — use world-space rect fallback)
+    // Receive fills from other users. Only replay fills that include a saved snapshot.
     socket.on("fill:create", (fill) => {
-      historyRef.current.push({ kind: "fill", value: { ...fill, imageData: null } });
+      if (!fill?.snapshot) return;
+      historyRef.current.push({ kind: "fill", value: fill });
       redrawBoard();
     });
 
@@ -1501,7 +1517,7 @@ function WhiteboardPage() {
             title="Undo (Ctrl + Z)"
             aria-label="Undo">
             <img src="/assets/undo.png" alt="" />
-            <span>Undo5</span>
+            <span>Undo</span>
           </button>
 
           <button
