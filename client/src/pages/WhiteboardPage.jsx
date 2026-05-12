@@ -7,9 +7,7 @@ import katex from "katex";
 import { useAuth } from "../context/AuthContext";
 
 import { getSocket } from "../socket";
-
 import InviteModal from "../components/InviteModal";
-
 import { useLocation } from "react-router-dom";
 
 // Routing
@@ -19,7 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 function WhiteboardPage() {
   const { logout } = useAuth();
   const navigate   = useNavigate();
-  const location = useLocation();
+  const location   = useLocation();
 
   /* CANVAS VARIABLES */
   const boardAreaRef = useRef(null);
@@ -78,7 +76,6 @@ function WhiteboardPage() {
   const colorRef = useRef(color);
   const colorInputRef = useRef(null);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
-  
 
   /* EQUATIONS VARIABLES */
   const equationInputRef = useRef(null);
@@ -89,6 +86,15 @@ function WhiteboardPage() {
   const equationDragOffsetRef = useRef({ x: 0, y: 0 });
   const equationDraftRef = useRef("");
   const equationSaveLockRef = useRef(false);
+
+  /* IMAGE VARIABLES */
+  const imageInputRef = useRef(null);
+  const movingImageIdRef = useRef(null);
+  const imageDragOffsetRef = useRef({ x: 0, y: 0 });
+  const [images, setImages] = useState([]);
+  const [selectedImageId, setSelectedImageId] = useState(null);
+  const resizingImageIdRef = useRef(null);
+  const imageResizeStartRef = useRef(null);
 
   /* SETTINGS */
   const [settings, setSettings] = useState({
@@ -106,8 +112,6 @@ function WhiteboardPage() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-
-
 
   // Update a setting while preserving the rest
   function handleSettingChange(key, value) {
@@ -378,6 +382,45 @@ function WhiteboardPage() {
     };
   }
 
+  // Shift control for shapes
+  function getShiftLockedShapeEnd(start, current) {
+    const dx = current.x - start.x;
+    const dy = current.y - start.y;
+
+    if (shapeType === "rectangle" || shapeType === "circle") {
+      const side = Math.min(Math.abs(dx), Math.abs(dy));
+
+      return {
+        x: start.x + Math.sign(dx || 1) * side,
+        y: start.y + Math.sign(dy || 1) * side
+      };
+    }
+
+    if (shapeType === "line") {
+      const angle = Math.atan2(dy, dx);
+      const snapStep = Math.PI / 4;
+      const snappedAngle = Math.round(angle / snapStep) * snapStep;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      return {
+        x: start.x + Math.cos(snappedAngle) * length,
+        y: start.y + Math.sin(snappedAngle) * length
+      };
+    }
+
+    if (shapeType === "triangle") {
+      const width = Math.abs(dx);
+      const height = width * Math.sqrt(3) / 2;
+
+      return {
+        x: current.x,
+        y: start.y + Math.sign(dy || 1) * height
+      };
+    }
+
+    return current;
+  }
+
   function createTextObject(point, text) {
     return {
       id: crypto.randomUUID(),
@@ -564,6 +607,11 @@ function WhiteboardPage() {
       setSelectedEquationId(newEquation.id);
       historyRef.current.push({ kind: "equation", value: newEquation });
       redoStackRef.current = [];
+      if (equationInput.editingExisting) {
+        getSocket()?.emit("equation:update", newEquation);
+      } else {
+        getSocket()?.emit("equation:create", newEquation);
+      }
     }
     setEquationInput(null);
     requestAnimationFrame(() => { equationSaveLockRef.current = false; });
@@ -608,6 +656,7 @@ function WhiteboardPage() {
       setStatus("Textbox created");
       historyRef.current.push({ kind: "textbox", value: newTextBox});
       redoStackRef.current = [];
+      getSocket()?.emit("textbox:create", newTextBox);
       return;
     }
 
@@ -728,8 +777,14 @@ function WhiteboardPage() {
       return;
     }
     if (tool === "shape" && activeShapeRef.current) {
-      activeShapeRef.current.end = getPointerPosition(event);
+      const currentPoint = getPointerPosition(event);
+
+      activeShapeRef.current.end = event.shiftKey
+        ? getShiftLockedShapeEnd(activeShapeRef.current.start, currentPoint)
+        : currentPoint;
+
       activeShapeRef.current.isShiftLocked = event.shiftKey;
+
       redrawBoard();
       return;
     }
@@ -809,49 +864,50 @@ function WhiteboardPage() {
 
   // Finishes current stroke / camera movement while cursor is movement
   /* THIS NEEDS TO BE UPDATED AT A LATER DATE -------------------------------------------------------------------------------------------------------------- */
-    function stopDrawing() {
-      selectedObjectRef.current = null;
-      if (isPanningRef.current) {
-        isPanningRef.current = false;
-        setStatus("Move complete");
-        return;
-      }
+  function stopDrawing() {
+    selectedObjectRef.current = null;
+    if (isPanningRef.current) {
+      isPanningRef.current = false;
+      setStatus("Move complete");
+      return;
+    }
 
-      if (!isDrawingRef.current) return;
+    if (!isDrawingRef.current) return;
 
-      if (tool === "shape" && activeShapeRef.current) {
-        const finishedShape = activeShapeRef.current;
-        const shapeStroke = {
-          ...finishedShape,
-          kind: "shape"
-        };
-        strokesRef.current.push(shapeStroke);
-        historyRef.current.push({ kind: "stroke", value: shapeStroke });
-        activeShapeRef.current = null;
-        redoStackRef.current = [];
-        isDrawingRef.current = false;
-        redrawBoard();
-        setStatus(`${shapeType} placed`);
-        return;
-      }
-      isDrawingRef.current = false;
-      if (!currentStrokeRef.current) return;
-      const finishedStroke = currentStrokeRef.current;
-      strokesRef.current.push(finishedStroke);
-      historyRef.current.push({ kind: "stroke", value: finishedStroke });
+    if (tool === "shape" && activeShapeRef.current) {
+      const finishedShape = activeShapeRef.current;
+      const shapeStroke = {
+        ...finishedShape,
+        kind: "shape"
+      };
+      strokesRef.current.push(shapeStroke);
+      historyRef.current.push({ kind: "stroke", value: shapeStroke });
+      activeShapeRef.current = null;
       redoStackRef.current = [];
-      currentStrokeRef.current = null;
-      setStrokeCount(strokesRef.current.length);
-      getSocket()?.emit("stroke:create", finishedStroke);
-      setStatus(`${strokesRef.current.length} stroke${strokesRef.current.length === 1 ? "" : "s"} on board`);
+      isDrawingRef.current = false;
+      redrawBoard();
+      getSocket()?.emit("shape:create", finishedShape);
+      setStatus(`${shapeType} placed`);
+      return;
+    }
+    isDrawingRef.current = false;
+    if (!currentStrokeRef.current) return;
+    const finishedStroke = currentStrokeRef.current;
+    strokesRef.current.push(finishedStroke);
+    historyRef.current.push({ kind: "stroke", value: finishedStroke });
+    redoStackRef.current = [];
+    currentStrokeRef.current = null;
+    setStrokeCount(strokesRef.current.length);
+    getSocket()?.emit("stroke:create", finishedStroke);
+    setStatus(`${strokesRef.current.length} stroke${strokesRef.current.length === 1 ? "" : "s"} on board`);
   }
 
   // Ctrl + Z
   /* THIS NEEDS TO BE UPDATED AT A LATER DATE -------------------------------------------------------------------------------------------------------------- */
   function undoStroke() {
-  if (historyRef.current.length === 0) return;
-  const item = historyRef.current.pop();
-  redoStackRef.current.push(item);
+    if (historyRef.current.length === 0) return;
+    const item = historyRef.current.pop();
+    redoStackRef.current.push(item);
 
     if (item.kind === "stroke") {
       strokesRef.current = strokesRef.current.filter(stroke => stroke.id !== item.value.id);
@@ -872,9 +928,14 @@ function WhiteboardPage() {
       setEquations(previous => previous.filter(equation => equation.id !== item.value.id));
       setSelectedEquationId(null);
     }
+
+    if (item.kind === "image") {
+      setImages(previous => previous.filter(image => image.id !== item.value.id));
+      setSelectedImageId(null);
+    }
+
     redrawBoard();
     setStatus("Undo complete");
-    // Future sync point:
     getSocket()?.emit("stroke:undo");
   }
 
@@ -895,6 +956,12 @@ function WhiteboardPage() {
     }
     if (item.kind === "textbox") {
       setTextBoxes(previous => [...previous, item.value]);
+    }
+    if (item.kind === "equation") {
+      setEquations(previous => [...previous, item.value]);
+    }
+    if (item.kind === "image") {
+      setImages(previous => [...previous, item.value]);
     }
     redrawBoard();
     setStatus("Redo complete");
@@ -919,17 +986,74 @@ function WhiteboardPage() {
   // 
   function selectTool(nextTool) {
     setTool(nextTool);
+    setSelectedImageId(null);
     setSelectedTextBoxId(null);
     setSelectedEquationId(null);
     setEquationInput(null);
     setStatus(`${nextTool.charAt(0).toUpperCase() + nextTool.slice(1)} selected`);
   }
 
-  // Change colors 
+  // Handle uploading images
+  function handleImageUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Src = e.target.result;
+
+      const newImage = {
+        id: crypto.randomUUID(),
+        src: base64Src,
+        x: 100,
+        y: 100,
+        width: 240,
+        height: 160,
+        createdAt: Date.now()
+      };
+
+      setImages(previous => [...previous, newImage]);
+      historyRef.current.push({ kind: "image", value: newImage });
+      redoStackRef.current = [];
+      setSelectedImageId(newImage.id);
+      setTool("move");
+      setStatus("Image added");
+      getSocket()?.emit("image:create", newImage);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  }
+
+  // Change colors
   function handleColorChange(event) {
     const nextColor = event.target.value;
     colorRef.current = nextColor;
     setColor(nextColor);
+
+    if (tool === "move" && selectedTextBoxId) {
+      setTextBoxes(previous =>
+        previous.map(textBox =>
+          textBox.id === selectedTextBoxId
+            ? { ...textBox, color: nextColor }
+            : textBox
+        )
+      );
+      setStatus("Textbox color changed");
+      return;
+    }
+
+    if (tool === "move" && selectedEquationId) {
+      setEquations(previous =>
+        previous.map(equation =>
+          equation.id === selectedEquationId
+            ? { ...equation, color: nextColor }
+            : equation
+        )
+      );
+      setStatus("Equation color changed");
+      return;
+    }
+
     setStatus("Color changed");
   }
 
@@ -945,66 +1069,125 @@ function WhiteboardPage() {
     redrawBoard();
   }, [settings.canvasBackground, settings.gridEnabled, settings.gridSize, selectedObjectId]);
 
+  useEffect(() => {
+    if (!equationInput) return;
 
+    requestAnimationFrame(() => {
+      equationInputRef.current?.focus();
+      equationInputRef.current?.select();
+    });
+  }, [equationInput?.id]);
 
+  // Join the socket room when the whiteboard loads
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
 
-useEffect(() => {
-  if (!equationInput) return;
+    socket.emit("room:join", settings.roomName);
 
-  requestAnimationFrame(() => {
-    equationInputRef.current?.focus();
-    equationInputRef.current?.select();
-  });
-}, [equationInput?.id]);
+    // Load existing board state from server when joining
+    socket.on("board:state", ({ strokes, shapes, textBoxes, equations, images }) => {
+      const safeStrokes   = strokes    || [];
+      const safeShapes    = shapes     || [];
+      const safeTextBoxes = textBoxes  || [];
+      const safeEquations = equations  || [];
+      const safeImages    = images     || [];
 
-// Join the socket room when the whiteboard loads
-useEffect(() => {
-  const socket = getSocket();
-  if (!socket) return;
+      strokesRef.current = safeStrokes;
+      historyRef.current = [
+        ...safeStrokes.map(s => ({ kind: "stroke",   value: s })),
+        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" } })),
+        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t })),
+        ...safeEquations.map(e => ({ kind: "equation", value: e })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i })),
+      ];
 
-  socket.emit("room:join", settings.roomName);
+      // Push shapes into objectsRef so they render on canvas
+      objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
 
-  // Load existing board state from server when joining
-  socket.on("board:state", ({ strokes }) => {
-    historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
-    strokesRef.current = strokes;
-    setStrokeCount(strokes.length);
-    requestAnimationFrame(() => redrawBoard());
-  });
+      setTextBoxes(safeTextBoxes);
+      setEquations(safeEquations);
+      setImages(safeImages);
+      setStrokeCount(safeStrokes.length);
+      requestAnimationFrame(() => redrawBoard());
+    });
 
-  // Receive strokes from other users
-  socket.on("stroke:create", (stroke) => {
-    strokesRef.current.push(stroke);
-    historyRef.current.push({ kind: "stroke", value: stroke });
-    setStrokeCount(strokesRef.current.length);
-    redrawBoard();
-  });
+    // Receive strokes from other users
+    socket.on("stroke:create", (stroke) => {
+      strokesRef.current.push(stroke);
+      historyRef.current.push({ kind: "stroke", value: stroke });
+      setStrokeCount(strokesRef.current.length);
+      redrawBoard();
+    });
 
-  // Someone else undid a stroke
-  socket.on("board:state", ({ strokes }) => {
-    historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
-    strokesRef.current = strokes;
-    setStrokeCount(strokes.length);
-    redrawBoard();
-  });
+    // Receive shapes from other users
+    socket.on("shape:create", (shape) => {
+      const shapeStroke = { ...shape, kind: "shape" };
+      strokesRef.current.push(shapeStroke);
+      historyRef.current.push({ kind: "stroke", value: shapeStroke });
+      redrawBoard();
+    });
 
-  // Board was cleared by someone
-  socket.on("board:cleared", () => {
-    strokesRef.current = [];
-    historyRef.current = [];
-    redoStackRef.current = [];
-    setStrokeCount(0);
-    redrawBoard();
-    setStatus("Board cleared by another user");
-  });
+    // Receive textboxes from other users
+    socket.on("textbox:create", (textBox) => {
+      setTextBoxes(prev => [...prev, textBox]);
+      historyRef.current.push({ kind: "textbox", value: textBox });
+    });
 
-  return () => {
-    socket.off("board:state");
-    socket.off("stroke:create");
-    socket.off("board:cleared");
-  };
-}, [settings.roomName]);
+    // Receive textbox updates from other users
+    socket.on("textbox:update", (textBox) => {
+      setTextBoxes(prev => prev.map(t => t.id === textBox.id ? textBox : t));
+    });
 
+    // Receive equations from other users
+    socket.on("equation:create", (equation) => {
+      setEquations(prev => [...prev, equation]);
+      historyRef.current.push({ kind: "equation", value: equation });
+    });
+
+    // Receive equation updates from other users
+    socket.on("equation:update", (equation) => {
+      setEquations(prev => prev.map(e => e.id === equation.id ? equation : e));
+    });
+
+    // Receive images from other users
+    socket.on("image:create", (image) => {
+      setImages(prev => [...prev, image]);
+      historyRef.current.push({ kind: "image", value: image });
+    });
+
+    // Receive image updates from other users
+    socket.on("image:update", (image) => {
+      setImages(prev => prev.map(i => i.id === image.id ? image : i));
+    });
+
+    // Board was cleared by someone
+    socket.on("board:cleared", () => {
+      strokesRef.current = [];
+      objectsRef.current = [];
+      historyRef.current = [];
+      redoStackRef.current = [];
+      setTextBoxes([]);
+      setEquations([]);
+      setImages([]);
+      setStrokeCount(0);
+      redrawBoard();
+      setStatus("Board cleared by another user");
+    });
+
+    return () => {
+      socket.off("board:state");
+      socket.off("stroke:create");
+      socket.off("shape:create");
+      socket.off("textbox:create");
+      socket.off("textbox:update");
+      socket.off("equation:create");
+      socket.off("equation:update");
+      socket.off("image:create");
+      socket.off("image:update");
+      socket.off("board:cleared");
+    };
+  }, [settings.roomName]);
 
   // Register keyboard shortcuts
   useEffect(() => {
@@ -1014,17 +1197,48 @@ useEffect(() => {
         targetTag === "input" ||
         targetTag === "textarea" ||
         targetTag === "select";
-        
+
+      const key = event.key.toLowerCase();
+
+      if ((key === "delete" || key === "backspace") && tool === "move") {
+        // Delete selected textbox
+        if (selectedTextBoxId) {
+          setTextBoxes(previous =>
+            previous.filter(textBox => textBox.id !== selectedTextBoxId)
+          );
+          setSelectedTextBoxId(null);
+          setStatus("Textbox deleted");
+          return;
+        }
+
+        // Delete selected equation
+        if (selectedEquationId) {
+          setEquations(previous =>
+            previous.filter(equation => equation.id !== selectedEquationId)
+          );
+          setSelectedEquationId(null);
+          setStatus("Equation deleted");
+          return;
+        }
+
+        if (selectedImageId) {
+          setImages(previous =>
+            previous.filter(image => image.id !== selectedImageId)
+          );
+          setSelectedImageId(null);
+          setStatus("Image deleted");
+          return;
+        }
+      }
 
       if (isTyping) {
         return;
       }
 
       if (equationInput) {
-  return;
-}
+        return;
+      }
 
-      const key = event.key.toLowerCase();
       if (event.ctrlKey && key === "z") {
         event.preventDefault();
         undoStroke();
@@ -1055,17 +1269,7 @@ useEffect(() => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [tool, color, size, settings]);
-
-
-
-
-
-
-
-
-
-
+  }, [tool, color, size, settings, selectedTextBoxId, selectedEquationId, selectedImageId, equationInput]);
 
   return (
     <main className="app">
@@ -1080,7 +1284,7 @@ useEffect(() => {
           onClick={() => selectTool("move")}
           title="Move (M)"
           aria-label="Move">
-          <img src="/assets/cursors/move_cursor.png" alt="" />
+          <img src="/assets/move.png" alt="" />
           <span>Move</span>
           </button>
 
@@ -1126,7 +1330,6 @@ useEffect(() => {
             <img src="/assets/eraser.png" alt="" />
             <span>Eraser</span>
           </button>
-
 
           <button
             className={`tool-button image-tool-button ${tool === "text" ? "active" : ""}`}
@@ -1199,58 +1402,76 @@ useEffect(() => {
               <span className="size-value">{fillTolerance}%</span>
             </label>
           )}
-        
-        <button
-          className="tool-button image-tool-button"
-          type="button"
-          onClick={undoStroke}
-          title="Undo (Ctrl + Z)"
-           aria-label="Undo">
-          <img src="/assets/undo.png" alt="" />
-           <span>Undo</span>
-        </button>
 
-        <button
-          className="tool-button image-tool-button"
-          type="button"
-          onClick={redoStroke}
-          title="Undo (Ctrl + Z)"
-          aria-label="Undo">
-          <img src="/assets/redo.png" alt="" />
-          <span>Redo</span>
-        </button>
+          <button
+            className="tool-button image-tool-button"
+            type="button"
+            onClick={() => imageInputRef.current.click()}
+            title="Add Image"
+            aria-label="Add Image"
+          >
+            <img src="/assets/image.png" alt="" />
+            <span>Image</span>
+          </button>
 
-        <button className="tool-button danger" type="button" onClick={clearBoard}>
-          Clear
-        </button>
-
-        <div className="toolbar-right-controls">
-          <label className="control-group">
-            Color
-
-            <button
-              type="button"
-              className="color-preview-button"
-              style={{ backgroundColor: color }}
-                onClick={() => {
-                if (isColorPickerOpen) {
-                  colorInputRef.current.blur();
-                  setIsColorPickerOpen(false);
-                  return;
-                }
-                setIsColorPickerOpen(true);
-                colorInputRef.current.click();
-              }}
-            />
           <input
-            ref={colorInputRef}
-            type="color"
-            value={color}
-            className="hidden-color-input"
-            onChange={handleColorChange}
-            onBlur={() => setIsColorPickerOpen(false)}
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleImageUpload}
           />
-          </label>
+
+          <button
+            className="tool-button image-tool-button"
+            type="button"
+            onClick={undoStroke}
+            title="Undo (Ctrl + Z)"
+            aria-label="Undo">
+            <img src="/assets/undo.png" alt="" />
+            <span>Undo</span>
+          </button>
+
+          <button
+            className="tool-button image-tool-button"
+            type="button"
+            onClick={redoStroke}
+            title="Redo (Ctrl + Y)"
+            aria-label="Redo">
+            <img src="/assets/redo.png" alt="" />
+            <span>Redo</span>
+          </button>
+
+          <button className="tool-button danger" type="button" onClick={clearBoard}>
+            Clear
+          </button>
+
+          <div className="toolbar-right-controls">
+            <label className="control-group">
+              Color
+              <button
+                type="button"
+                className="color-preview-button"
+                style={{ backgroundColor: color }}
+                onClick={() => {
+                  if (isColorPickerOpen) {
+                    colorInputRef.current.blur();
+                    setIsColorPickerOpen(false);
+                    return;
+                  }
+                  setIsColorPickerOpen(true);
+                  colorInputRef.current.click();
+                }}
+              />
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={color}
+                className="hidden-color-input"
+                onChange={handleColorChange}
+                onBlur={() => setIsColorPickerOpen(false)}
+              />
+            </label>
             <label className="control-group">
               Size
               <input
@@ -1262,7 +1483,7 @@ useEffect(() => {
               />
               <span className="size-value">{size}px</span>
             </label>
-            </div>
+          </div>
         </nav>
 
         <button
@@ -1302,7 +1523,7 @@ useEffect(() => {
             </div>
           )}
         </div>
-        </header>
+      </header>
 
       <section ref={boardAreaRef} className="board-area">
         <canvas
@@ -1330,19 +1551,136 @@ useEffect(() => {
           />
         )}
 
-        {textBoxes.map(textBox => {
-          const camera = cameraRef.current;
+        <div
+          className="overlay-layer"
+          style={{
+            transform: `translate(${cameraRef.current.x}px, ${cameraRef.current.y}px) scale(${cameraRef.current.zoom})`
+          }}
+        >
+          {images.map(image => (
+            <div
+            key={image.id}
+            className={`whiteboard-image-wrapper ${
+              selectedImageId === image.id ? "selected" : ""
+            } ${tool === "move" ? "image-move-enabled" : "image-move-disabled"}`}
+            style={{
+              left: `${image.x}px`,
+              top: `${image.y}px`,
+              width: `${image.width}px`,
+              height: `${image.height}px`
+            }}
+            onPointerDown={event => {
+              event.stopPropagation();
+
+              setSelectedImageId(image.id);
+              setSelectedTextBoxId(null);
+              setSelectedEquationId(null);
+
+              if (tool === "move") {
+                const point = getPointerPosition(event);
+
+                movingImageIdRef.current = image.id;
+
+                imageDragOffsetRef.current = {
+                  x: point.x - image.x,
+                  y: point.y - image.y
+                };
+
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }
+            }}
+            onPointerMove={event => {
+              if (!movingImageIdRef.current || tool !== "move") return;
+
+              const point = getPointerPosition(event);
+
+              setImages(previous =>
+                previous.map(item =>
+                  item.id === movingImageIdRef.current
+                    ? {
+                        ...item,
+                        x: point.x - imageDragOffsetRef.current.x,
+                        y: point.y - imageDragOffsetRef.current.y
+                      }
+                    : item
+                )
+              );
+            }}
+            onPointerUp={() => {
+              if (movingImageIdRef.current) {
+                const moved = images.find(i => i.id === movingImageIdRef.current);
+                if (moved) getSocket()?.emit("image:update", moved);
+              }
+              movingImageIdRef.current = null;
+            }}
+            onPointerCancel={() => {
+              movingImageIdRef.current = null;
+            }}
+          >
+              <img
+                src={image.src}
+                className="whiteboard-image"
+                draggable={false}
+              />
+
+              {selectedImageId === image.id && tool === "move" && (
+                <div
+                  className="image-resize-handle"
+                  onPointerDown={event => {
+                    event.stopPropagation();
+                    resizingImageIdRef.current = image.id;
+                    imageResizeStartRef.current = {
+                      startX: event.clientX,
+                      startY: event.clientY,
+                      width: image.width,
+                      height: image.height
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={event => {
+                    if (resizingImageIdRef.current !== image.id) return;
+
+                    const start = imageResizeStartRef.current;
+                    const dx = (event.clientX - start.startX) / cameraRef.current.zoom;
+                    const dy = (event.clientY - start.startY) / cameraRef.current.zoom;
+
+                    setImages(previous =>
+                      previous.map(item =>
+                        item.id === image.id
+                          ? {
+                              ...item,
+                              width: Math.max(40, start.width + dx),
+                              height: Math.max(40, start.height + dy)
+                            }
+                          : item
+                      )
+                    );
+                  }}
+                  onPointerUp={() => {
+                    if (resizingImageIdRef.current) {
+                      const resized = images.find(i => i.id === resizingImageIdRef.current);
+                      if (resized) getSocket()?.emit("image:update", resized);
+                    }
+                    resizingImageIdRef.current = null;
+                    imageResizeStartRef.current = null;
+                  }}
+                />
+              )}
+            </div>
+          ))}
+
+          {textBoxes.map(textBox => {
+          cameraVersion;
           const isSelected = selectedTextBoxId === textBox.id;
           return (
             <textarea
-            
               key={textBox.id}
               className={`permanent-textbox ${isSelected ? "selected" : ""} ${tool === "move" ? "move-mode" : ""}`}
               style={{
-                left: `${textBox.x * camera.zoom + camera.x}px`,
-                top: `${textBox.y * camera.zoom + camera.y}px`,
+                left: `${textBox.x}px`,
+                top: `${textBox.y}px`,
                 color: textBox.color,
-                fontSize: `${textBox.fontSize * camera.zoom}px`,
+                fontSize: `${textBox.fontSize}px`,
                 fontFamily: textBox.fontFamily
               }}
               value={textBox.value}
@@ -1387,6 +1725,8 @@ useEffect(() => {
                 const nextValue = textarea.value;
                 setTextBoxes(previous => previous.map(item => item.id === textBox.id ? { ...item, value: nextValue } : item));
                 resizeTextArea(textarea);
+                const updated = { ...textBox, value: nextValue };
+                getSocket()?.emit("textbox:update", updated);
               }}
               onKeyDown={event => {
                 if (event.key === "Escape") {
@@ -1413,8 +1753,8 @@ useEffect(() => {
           );
         })}
 
-        {equations.map(equation => {
-          const camera = cameraRef.current;
+          {equations.map(equation => {
+          cameraVersion;
 
           return (
             <div
@@ -1423,10 +1763,10 @@ useEffect(() => {
                 selectedEquationId === equation.id ? "selected" : ""
               } ${tool === "move" ? "move-mode" : ""}`}
               style={{
-                left: `${equation.x * camera.zoom + camera.x}px`,
-                top: `${equation.y * camera.zoom + camera.y}px`,
+                left: `${equation.x}px`,
+                top: `${equation.y}px`,
                 color: equation.color,
-                fontSize: `${equation.fontSize * camera.zoom}px`
+                fontSize: `${equation.fontSize}px`
               }}
               onPointerDown={event => {
                 event.stopPropagation();
@@ -1490,8 +1830,8 @@ useEffect(() => {
           <div
             className="equation-input-box"
             style={{
-              left: `${equationInput.x * cameraRef.current.zoom + cameraRef.current.x}px`,
-              top: `${equationInput.y * cameraRef.current.zoom + cameraRef.current.y}px`
+              left: `${equationInput.x}px`,
+              top: `${equationInput.y}px`
             }}
             onPointerDown={event => event.stopPropagation()}
           >
@@ -1563,6 +1903,7 @@ useEffect(() => {
             </div>
           </div>
         )}
+        </div>
 
         {settings.showStatus && ( <div className="status"> {status} · {strokeCount} total </div> )}
       </section>
@@ -1572,6 +1913,7 @@ useEffect(() => {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSettingChange={handleSettingChange}
+        onClearWhiteboard={() => { clearBoard(); setIsSettingsOpen(false); }}
       />
 
       {isInviteOpen && (
