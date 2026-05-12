@@ -61,6 +61,24 @@ const equationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const fillSchema = new mongoose.Schema(
+  {
+    id:        { type: String, required: true },
+    color:     { type: String, required: true },
+    createdAt: { type: Number }
+  },
+  { _id: false }
+);
+
+const fillSchema = new mongoose.Schema(
+  {
+    id:        { type: String, required: true },
+    color:     { type: String, required: true },
+    createdAt: { type: Number }
+  },
+  { _id: false }
+);
+
 const imageSchema = new mongoose.Schema(
   {
     id:        { type: String, required: true },
@@ -88,6 +106,8 @@ const boardSchema = new mongoose.Schema(
     textBoxes: { type: [textBoxSchema],  default: [] },
     equations: { type: [equationSchema], default: [] },
     images:    { type: [imageSchema],    default: [] },
+    fills:     { type: [fillSchema],     default: [] },
+    fills:     { type: [fillSchema],     default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     background: { type: String, default: "#ffffff" },
     members: {

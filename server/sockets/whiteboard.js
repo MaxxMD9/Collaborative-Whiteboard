@@ -39,6 +39,7 @@ function registerSocketHandlers(io) {
           textBoxes:  board.textBoxes,
           equations:  board.equations,
           images:     board.images,
+          fills:      board.fills || [],
           background: board.background
         });
         socket.to(roomName).emit("room:user_joined", { username: socket.user.username });
@@ -108,6 +109,24 @@ function registerSocketHandlers(io) {
       } catch (err) { console.error("[Socket] equation:update error:", err); }
     });
 
+    socket.on("fill:create", async (fill) => {
+      const room = socket.currentRoom;
+      if (!room) return;
+      try {
+        socket.to(room).emit("fill:create", fill);
+        await Board.findOneAndUpdate({ roomName: room }, { $push: { fills: fill } });
+      } catch (err) { console.error("[Socket] fill:create error:", err); }
+    });
+
+    socket.on("fill:create", async (fill) => {
+      const room = socket.currentRoom;
+      if (!room) return;
+      try {
+        socket.to(room).emit("fill:create", fill);
+        await Board.findOneAndUpdate({ roomName: room }, { $push: { fills: fill } });
+      } catch (err) { console.error("[Socket] fill:create error:", err); }
+    });
+
     socket.on("image:create", async (image) => {
       const room = socket.currentRoom;
       if (!room) return;
@@ -145,6 +164,7 @@ function registerSocketHandlers(io) {
           textBoxes:  board.textBoxes,
           equations:  board.equations,
           images:     board.images,
+          fills:      board.fills || [],
           background: board.background
         });
       } catch (err) { console.error("[Socket] stroke:undo error:", err); }
@@ -156,7 +176,7 @@ function registerSocketHandlers(io) {
       try {
         await Board.findOneAndUpdate(
           { roomName: room },
-          { $set: { strokes: [], shapes: [], textBoxes: [], equations: [], images: [] } }
+          { $set: { strokes: [], shapes: [], textBoxes: [], equations: [], images: [], fills: [] } }
         );
         io.to(room).emit("board:cleared");
       } catch (err) { console.error("[Socket] board:clear error:", err); }
