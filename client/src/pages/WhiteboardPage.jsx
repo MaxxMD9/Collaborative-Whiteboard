@@ -463,22 +463,6 @@ function WhiteboardPage() {
       if (item.kind === "stroke") {
         drawFullStroke(ctx, item.value);
       }
-      if (item.kind === "fill") {
-        if (item.value.cachedImage) {
-          // Draw pre-cached image outside camera transform
-          ctx.restore();
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.drawImage(item.value.cachedImage, 0, 0);
-          ctx.restore();
-          ctx.save();
-          ctx.translate(camera.x, camera.y);
-          ctx.scale(camera.zoom, camera.zoom);
-        } else {
-          // Restored from server (no snapshot): best effort world-space rect
-          ctx.fillStyle = item.value.color;
-        }
-      }
     }
     if (currentStrokeRef.current) {
       drawFullStroke(ctx, currentStrokeRef.current);
