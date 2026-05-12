@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import "./Lobby.css";
 
 export default function Lobby() {
   const { user, token, logout } = useAuth();
@@ -14,7 +15,7 @@ export default function Lobby() {
 
   // Load existing boards on mount
   useEffect(() => {
-    fetch("http://localhost:3001/api/boards", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/boards`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -28,7 +29,7 @@ export default function Lobby() {
     setLoading(true);
 
     try {
-      const res  = await fetch("http://localhost:3001/api/boards", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/boards`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
@@ -58,7 +59,7 @@ export default function Lobby() {
     setLoading(true);
 
     try {
-      const res  = await fetch("http://localhost:3001/api/invites/join", {
+      const res  = await fetch(`${import.meta.env.VITE_API_URL}/api/invites/join`, {
         method:  "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,219 +84,90 @@ export default function Lobby() {
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <h1 style={styles.logo}>Whiteboard</h1>
-        <div style={styles.headerRight}>
-          <span style={styles.username}>Hi, {user?.username}</span>
-          <button style={styles.signOutButton} onClick={() => { logout(); navigate("/"); }}>
-            Sign Out
-          </button>
-        </div>
-      </header>
+    <div className="lobby-page">
+  <header className="lobby-header">
+    <img src="/assets/logo_image.png" alt="Interboard logo" className="lobby-logo" />
 
-      <main style={styles.main}>
-        {error && <p style={styles.error}>{error}</p>}
-
-        <div style={styles.cards}>
-          {/* Create a Room */}
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Create a Room</h2>
-            <p style={styles.cardDescription}>
-              Start a new whiteboard and invite others to join.
-            </p>
-            <form onSubmit={handleCreateRoom} style={styles.form}>
-              <input
-                type="text"
-                placeholder="Room name"
-                value={roomName}
-                onChange={e => setRoomName(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <button type="submit" style={styles.primaryButton} disabled={loading}>
-                {loading ? "Creating..." : "Create Room"}
-              </button>
-            </form>
-          </div>
-
-          {/* Join a Room */}
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Join a Room</h2>
-            <p style={styles.cardDescription}>
-              Enter an invite code shared by a room owner.
-            </p>
-            <form onSubmit={handleJoinRoom} style={styles.form}>
-              <input
-                type="text"
-                placeholder="Invite code (e.g. a3f9bc)"
-                value={inviteCode}
-                onChange={e => setInviteCode(e.target.value)}
-                style={styles.input}
-                required
-              />
-              <button type="submit" style={styles.primaryButton} disabled={loading}>
-                {loading ? "Joining..." : "Join Room"}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Existing Boards */}
-        {boards.length > 0 && (
-          <div style={styles.boardsSection}>
-            <h2 style={styles.boardsTitle}>Your Rooms</h2>
-            <div style={styles.boardsGrid}>
-              {boards.map(board => (
-                <div
-                  key={board._id}
-                  style={styles.boardCard}
-                  onClick={() => navigate("/whiteboard", { state: { roomName: board.roomName } })}
-                >
-                  <div style={styles.boardIcon}>📋</div>
-                  <div style={styles.boardName}>{board.roomName}</div>
-                  <div style={styles.boardMeta}>
-                    Created by {board.createdBy?.username || "unknown"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
+    <div className="lobby-header-right">
+      <span className="lobby-username">Hi, {user?.username}</span>
+      <button className="lobby-signout-button" onClick={() => { logout(); navigate("/"); }}>
+        Sign Out
+      </button>
     </div>
+  </header>
+
+  <main className="lobby-main">
+    <h1 className="lobby-title">Choose your board</h1>
+    <p className="lobby-subtitle">Create a new room or join an existing one to start collaborating.</p>
+
+    {error && <p className="lobby-error">{error}</p>}
+
+    <div className="lobby-cards">
+      <div className="lobby-card">
+        <h2 className="lobby-card-title">Create a Room</h2>
+        <p className="lobby-card-description">
+          Start a new whiteboard and invite others to join.
+        </p>
+
+        <form onSubmit={handleCreateRoom} className="lobby-form">
+          <input
+            type="text"
+            placeholder="Room name"
+            value={roomName}
+            onChange={e => setRoomName(e.target.value)}
+            className="lobby-input"
+            required
+          />
+          <button type="submit" className="lobby-primary-button" disabled={loading}>
+            {loading ? "Creating..." : "Create Room"}
+          </button>
+        </form>
+      </div>
+
+      <div className="lobby-card-reverse">
+        <h2 className="lobby-card-title">Join a Room</h2>
+        <p className="lobby-card-description">
+          Enter an invite code shared by a room owner.
+        </p>
+
+        <form onSubmit={handleJoinRoom} className="lobby-form">
+          <input
+            type="text"
+            placeholder="Invite code (e.g. a3f9bc)"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value)}
+            className="lobby-input"
+            required
+          />
+          <button type="submit" className="lobby-primary-button" disabled={loading}>
+            {loading ? "Joining..." : "Join Room"}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {boards.length > 0 && (
+      <div className="lobby-boards-section">
+        <h2 className="lobby-boards-title">Your Rooms</h2>
+
+        <div className="lobby-boards-grid">
+          {boards.map(board => (
+            <div
+              key={board._id}
+              className="lobby-board-card"
+              onClick={() => navigate("/whiteboard", { state: { roomName: board.roomName } })}
+            >
+              <div className="lobby-board-icon">📋</div>
+              <div className="lobby-board-name">{board.roomName}</div>
+              <div className="lobby-board-meta">
+                Created by {board.createdBy?.username || "unknown"}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </main>
+</div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight:       "100vh",
-    backgroundColor: "#f8fafc",
-    fontFamily:      "Arial, sans-serif"
-  },
-  header: {
-    height:          "56px",
-    backgroundColor: "#050505",
-    display:         "flex",
-    alignItems:      "center",
-    justifyContent:  "space-between",
-    padding:         "0 24px"
-  },
-  logo: {
-    color:      "#ffffff",
-    fontSize:   "18px",
-    fontWeight: "800",
-    margin:     0
-  },
-  headerRight: {
-    display:    "flex",
-    alignItems: "center",
-    gap:        "16px"
-  },
-  username: {
-    color:    "#9ca3af",
-    fontSize: "14px"
-  },
-  signOutButton: {
-    padding:      "6px 14px",
-    border:       "1px solid #374151",
-    borderRadius: "8px",
-    background:   "transparent",
-    color:        "#ffffff",
-    cursor:       "pointer",
-    fontSize:     "13px"
-  },
-  main: {
-    maxWidth: "900px",
-    margin:   "60px auto",
-    padding:  "0 24px"
-  },
-  error: {
-    color:        "#dc2626",
-    background:   "#fee2e2",
-    padding:      "10px 16px",
-    borderRadius: "8px",
-    marginBottom: "24px",
-    fontSize:     "14px"
-  },
-  cards: {
-    display:             "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap:                 "24px"
-  },
-  card: {
-    background:   "#ffffff",
-    borderRadius: "12px",
-    padding:      "28px",
-    boxShadow:    "0 2px 12px rgba(0,0,0,0.06)"
-  },
-  cardTitle: {
-    fontSize:   "18px",
-    fontWeight: "700",
-    color:      "#111827",
-    margin:     "0 0 8px"
-  },
-  cardDescription: {
-    fontSize: "14px",
-    color:    "#6b7280",
-    margin:   "0 0 20px"
-  },
-  form: {
-    display:       "flex",
-    flexDirection: "column",
-    gap:           "12px"
-  },
-  input: {
-    padding:      "10px 14px",
-    border:       "1px solid #d1d5db",
-    borderRadius: "8px",
-    fontSize:     "14px",
-    outline:      "none"
-  },
-  primaryButton: {
-    padding:      "10px",
-    border:       "none",
-    borderRadius: "8px",
-    background:   "#1a73e8",
-    color:        "#ffffff",
-    fontWeight:   "700",
-    cursor:       "pointer",
-    fontSize:     "14px"
-  },
-  boardsSection: {
-    marginTop: "40px"
-  },
-  boardsTitle: {
-    fontSize:     "18px",
-    fontWeight:   "700",
-    color:        "#111827",
-    marginBottom: "16px"
-  },
-  boardsGrid: {
-    display:             "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-    gap:                 "16px"
-  },
-  boardCard: {
-    background:   "#ffffff",
-    borderRadius: "12px",
-    padding:      "20px",
-    boxShadow:    "0 2px 12px rgba(0,0,0,0.06)",
-    cursor:       "pointer",
-    transition:   "transform 0.15s ease, box-shadow 0.15s ease"
-  },
-  boardIcon: {
-    fontSize:     "32px",
-    marginBottom: "8px"
-  },
-  boardName: {
-    fontSize:     "15px",
-    fontWeight:   "700",
-    color:        "#111827",
-    marginBottom: "4px"
-  },
-  boardMeta: {
-    fontSize: "12px",
-    color:    "#9ca3af"
-  }
-};

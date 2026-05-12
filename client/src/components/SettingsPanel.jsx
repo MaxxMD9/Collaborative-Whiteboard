@@ -1,5 +1,5 @@
 
-function SettingsPanel({ isOpen, onClose, settings, onSettingChange }) {
+function SettingsPanel({ isOpen, onClose, settings, onSettingChange, onClearWhiteboard }) {
   if (!isOpen) return null;
 
   const categories = [
@@ -145,8 +145,11 @@ function SettingsPanel({ isOpen, onClose, settings, onSettingChange }) {
         </div>
 
         <footer className="settings-footer">
-          <button className="settings-footer-button" type="button">
-            Reset All Settings
+          <button
+            className="settings-footer-button settings-danger-button"
+            onClick={onClearWhiteboard}
+          >
+            Clear Whiteboard
           </button>
           <button className="settings-footer-button" type="button" onClick={onClose}>
             Close

@@ -1,11 +1,11 @@
 import { io } from "socket.io-client";
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 let socket = null;
 
 export function connectSocket(token) {
-  // If already connected with same token, reuse existing socket
+  // If already connected with same token, reuse existing socket.
   if (socket?.connected) return socket;
 
   // Only create a new socket if one doesn't exist
