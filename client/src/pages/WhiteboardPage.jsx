@@ -1108,7 +1108,13 @@ function WhiteboardPage() {
       const safeTextBoxes = textBoxes  || [];
       const safeEquations = equations  || [];
       const safeImages    = images     || [];
-      const safeFills     = fills      || [];
+      // Deduplicate fills by id in case of duplicate saves
+      const seenFillIds = new Set();
+      const safeFills = (fills || []).filter(f => {
+        if (seenFillIds.has(f.id)) return false;
+        seenFillIds.add(f.id);
+        return true;
+      });
 
       strokesRef.current = safeStrokes;
 

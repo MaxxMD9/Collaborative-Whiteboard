@@ -114,7 +114,11 @@ function registerSocketHandlers(io) {
       if (!room) return;
       try {
         socket.to(room).emit("fill:create", fill);
-        await Board.findOneAndUpdate({ roomName: room }, { $push: { fills: fill } });
+        // Only save if this fill id doesn't already exist
+        await Board.findOneAndUpdate(
+          { roomName: room, "fills.id": { $ne: fill.id } },
+          { $push: { fills: fill } }
+        );
       } catch (err) { console.error("[Socket] fill:create error:", err); }
     });
 
@@ -123,7 +127,11 @@ function registerSocketHandlers(io) {
       if (!room) return;
       try {
         socket.to(room).emit("fill:create", fill);
-        await Board.findOneAndUpdate({ roomName: room }, { $push: { fills: fill } });
+        // Only save if this fill id doesn't already exist
+        await Board.findOneAndUpdate(
+          { roomName: room, "fills.id": { $ne: fill.id } },
+          { $push: { fills: fill } }
+        );
       } catch (err) { console.error("[Socket] fill:create error:", err); }
     });
 
