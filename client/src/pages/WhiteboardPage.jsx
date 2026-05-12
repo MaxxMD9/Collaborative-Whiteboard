@@ -475,14 +475,20 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-  const fill = item.value;
-  const pixelRatio = window.devicePixelRatio || 1;
+        const fillImage = ensureFillImage(item.value);
 
-  const canvasX = Math.floor((fill.x * camera.zoom + camera.x) * pixelRatio);
-  const canvasY = Math.floor((fill.y * camera.zoom + camera.y) * pixelRatio);
-
-  applyFloodFill(canvasX, canvasY, fill.color, fill.tolerance);
-}
+        if (fillImage && fillImage.complete) {
+          // Fill snapshots are full-canvas bitmap states, so draw them in screen/canvas space.
+          ctx.restore();
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(fillImage, 0, 0);
+          ctx.restore();
+          ctx.save();
+          ctx.translate(camera.x, camera.y);
+          ctx.scale(camera.zoom, camera.zoom);
+        }
+      }
     }
     if (currentStrokeRef.current) {
       drawFullStroke(ctx, currentStrokeRef.current);
@@ -829,63 +835,6 @@ function WhiteboardPage() {
     );
   }
 
-  function applyFloodFill(x, y, fillHex, toleranceValue) {
-  const canvas = canvasRef.current;
-  const ctx = getCanvasContext();
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  const startIndex = (y * canvas.width + x) * 4;
-  const targetColor = [
-    data[startIndex],
-    data[startIndex + 1],
-    data[startIndex + 2],
-    data[startIndex + 3]
-  ];
-
-  const fillColor = hexToRgbArray(fillHex);
-  const tolerance = Number(toleranceValue);
-
-  if (colorsMatch(targetColor, fillColor, tolerance)) return;
-
-  const stack = [[x, y]];
-  const visited = new Uint8Array(canvas.width * canvas.height);
-
-  while (stack.length > 0) {
-    const [currentX, currentY] = stack.pop();
-
-    if (currentX < 0 || currentY < 0 || currentX >= canvas.width || currentY >= canvas.height) continue;
-
-    const pixelIndex = currentY * canvas.width + currentX;
-    if (visited[pixelIndex]) continue;
-
-    visited[pixelIndex] = 1;
-
-    const index = pixelIndex * 4;
-    const currentColor = [
-      data[index],
-      data[index + 1],
-      data[index + 2],
-      data[index + 3]
-    ];
-
-    if (!colorsMatch(currentColor, targetColor, tolerance)) continue;
-
-    data[index] = fillColor[0];
-    data[index + 1] = fillColor[1];
-    data[index + 2] = fillColor[2];
-    data[index + 3] = fillColor[3];
-
-    stack.push([currentX + 1, currentY]);
-    stack.push([currentX - 1, currentY]);
-    stack.push([currentX, currentY + 1]);
-    stack.push([currentX, currentY - 1]);
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-}
-
   // Fills an area using the paint bucket
   function floodFill(screenX, screenY) {
     const canvas = canvasRef.current;
@@ -933,20 +882,27 @@ function WhiteboardPage() {
     // Capture the canvas state as base64 AFTER the flood fill
     const camera = cameraRef.current;
     const snapshot = canvasRef.current.toDataURL("image/png");
-    const worldPoint = screenToWorld({ x: screenX, y: screenY });
-
     const newFill = {
       id: crypto.randomUUID(),
-      x: worldPoint.x,
-      y: worldPoint.y,
+      snapshot,                        // base64 PNG — used for local replay
+      snapshotCamera: { ...camera },   // camera state at time of fill
       color: colorRef.current,
-      tolerance: Number(fillTolerance),
       createdAt: Date.now()
     };
+    // Pre-cache as an Image element for synchronous drawing in redrawBoard
+    const cachedImage = new Image();
+    cachedImage.onload = () => redrawBoard();
+    cachedImage.src = snapshot;
+    newFill.cachedImage = cachedImage;
 
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    getSocket()?.emit("fill:create", newFill);
+    getSocket()?.emit("fill:create", {
+      id: newFill.id,
+      snapshot: newFill.snapshot,
+      color: newFill.color,
+      createdAt: newFill.createdAt
+    });
     setStatus("Fill complete");
   }
 
@@ -1218,8 +1174,8 @@ function WhiteboardPage() {
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
         ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
         ...safeFills
-  .filter(f => typeof f.x === "number" && typeof f.y === "number")
-  .map(f => ({ kind: "fill", value: f, t: f.createdAt || 0 })),
+          .filter(f => f.snapshot)
+          .map(f => ({ kind: "fill", value: { ...f, restored: true }, t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
