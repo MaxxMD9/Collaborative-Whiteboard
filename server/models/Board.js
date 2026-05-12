@@ -99,11 +99,11 @@ const boardSchema = new mongoose.Schema(
     images:    { type: [imageSchema],    default: [] },
     fills:     { type: [fillSchema],     default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    background: { type: String, default: "#ffffff" },
     members: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: []
-    }
+    },
+    background: { type: String, default: "#ffffff" }
   },
   { timestamps: true }
 );

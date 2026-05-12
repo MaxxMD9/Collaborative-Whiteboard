@@ -111,4 +111,27 @@ router.delete("/:roomName/strokes", requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/boards/:roomName
+// Delete a board entirely. Only the creator can do this.
+router.delete("/:roomName", requireAuth, async (req, res) => {
+  try {
+    const board = await Board.findOne({ roomName: req.params.roomName });
+
+    if (!board) {
+      return res.status(404).json({ error: "Board not found" });
+    }
+
+    if (board.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Only the room owner can delete this board" });
+    }
+
+    await Board.deleteOne({ roomName: req.params.roomName });
+
+    res.json({ message: "Board deleted" });
+  } catch (err) {
+    console.error("Delete board error:", err);
+    res.status(500).json({ error: "Could not delete board" });
+  }
+});
+
 module.exports = router;
