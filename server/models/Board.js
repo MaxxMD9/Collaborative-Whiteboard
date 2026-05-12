@@ -64,7 +64,6 @@ const equationSchema = new mongoose.Schema(
 const fillSchema = new mongoose.Schema(
   {
     id:        { type: String, required: true },
-    snapshot:  { type: String, required: true },
     color:     { type: String, required: true },
     createdAt: { type: Number }
   },
