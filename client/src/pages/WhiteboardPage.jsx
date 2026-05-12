@@ -30,6 +30,7 @@ function WhiteboardPage() {
   const objectsRef = useRef([]);
   const strokesRef = useRef([]);
   const historyRef = useRef([]);
+  const restoredFillsRef = useRef([]); // fills from server — rendered but not in undo history
   
   /* TOOL VARIABLES */
   const [tool, setTool]                     = useState("pencil");
@@ -458,6 +459,12 @@ function WhiteboardPage() {
     ctx.scale(camera.zoom, camera.zoom);
 
     drawGrid(ctx, rect.width / camera.zoom, rect.height / camera.zoom);
+
+    // Render server-restored fills first (these are background fills not in undo history)
+    for (const fill of restoredFillsRef.current) {
+      ctx.fillStyle = fill.color;
+      ctx.fillRect(-100000, -100000, 200000, 200000);
+    }
 
     for (const item of historyRef.current) {
       if (item.kind === "stroke") {
@@ -1017,6 +1024,7 @@ function WhiteboardPage() {
     objectsRef.current = [];
     historyRef.current = [];
     redoStackRef.current = [];
+    restoredFillsRef.current = [];
     activeShapeRef.current = null;
     setTextBoxes([]);
     setEquations([]);
@@ -1154,10 +1162,12 @@ function WhiteboardPage() {
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                          t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                         t: e.createdAt || 0 })),
         ...safeImages.map(i  => ({ kind: "image",    value: i,                           t: i.createdAt || 0 })),
-        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, imageData: null },   t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
+
+      // Store restored fills separately — rendered but NOT in undo history
+      restoredFillsRef.current = safeFills.map(f => ({ ...f, imageData: null }));
 
       objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
 
@@ -1229,6 +1239,7 @@ function WhiteboardPage() {
       objectsRef.current = [];
       historyRef.current = [];
       redoStackRef.current = [];
+      restoredFillsRef.current = [];
       setTextBoxes([]);
       setEquations([]);
       setImages([]);
