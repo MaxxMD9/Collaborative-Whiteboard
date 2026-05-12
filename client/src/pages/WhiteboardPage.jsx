@@ -607,6 +607,11 @@ function WhiteboardPage() {
       setSelectedEquationId(newEquation.id);
       historyRef.current.push({ kind: "equation", value: newEquation });
       redoStackRef.current = [];
+      if (equationInput.editingExisting) {
+        getSocket()?.emit("equation:update", newEquation);
+      } else {
+        getSocket()?.emit("equation:create", newEquation);
+      }
     }
     setEquationInput(null);
     requestAnimationFrame(() => { equationSaveLockRef.current = false; });
@@ -651,6 +656,7 @@ function WhiteboardPage() {
       setStatus("Textbox created");
       historyRef.current.push({ kind: "textbox", value: newTextBox});
       redoStackRef.current = [];
+      getSocket()?.emit("textbox:create", newTextBox);
       return;
     }
 
@@ -880,6 +886,7 @@ function WhiteboardPage() {
       redoStackRef.current = [];
       isDrawingRef.current = false;
       redrawBoard();
+      getSocket()?.emit("shape:create", finishedShape);
       setStatus(`${shapeType} placed`);
       return;
     }
@@ -991,23 +998,29 @@ function WhiteboardPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64Src = e.target.result;
 
-    const newImage = {
-      id: crypto.randomUUID(),
-      src: imageUrl,
-      x: 100,
-      y: 100,
-      width: 240,
-      height: 160
+      const newImage = {
+        id: crypto.randomUUID(),
+        src: base64Src,
+        x: 100,
+        y: 100,
+        width: 240,
+        height: 160,
+        createdAt: Date.now()
+      };
+
+      setImages(previous => [...previous, newImage]);
+      historyRef.current.push({ kind: "image", value: newImage });
+      redoStackRef.current = [];
+      setSelectedImageId(newImage.id);
+      setTool("move");
+      setStatus("Image added");
+      getSocket()?.emit("image:create", newImage);
     };
-
-    setImages(previous => [...previous, newImage]);
-    historyRef.current.push({ kind: "image", value: newImage });
-    redoStackRef.current = [];
-    setSelectedImageId(newImage.id);
-    setTool("move");
-    setStatus("Image added");
+    reader.readAsDataURL(file);
     event.target.value = "";
   }
 
@@ -1073,10 +1086,29 @@ function WhiteboardPage() {
     socket.emit("room:join", settings.roomName);
 
     // Load existing board state from server when joining
-    socket.on("board:state", ({ strokes }) => {
-      historyRef.current = strokes.map(stroke => ({ kind: "stroke", value: stroke }));
-      strokesRef.current = strokes;
-      setStrokeCount(strokes.length);
+    socket.on("board:state", ({ strokes, shapes, textBoxes, equations, images }) => {
+      const safeStrokes   = strokes    || [];
+      const safeShapes    = shapes     || [];
+      const safeTextBoxes = textBoxes  || [];
+      const safeEquations = equations  || [];
+      const safeImages    = images     || [];
+
+      strokesRef.current = safeStrokes;
+      historyRef.current = [
+        ...safeStrokes.map(s => ({ kind: "stroke",   value: s })),
+        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" } })),
+        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t })),
+        ...safeEquations.map(e => ({ kind: "equation", value: e })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i })),
+      ];
+
+      // Push shapes into objectsRef so they render on canvas
+      objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
+
+      setTextBoxes(safeTextBoxes);
+      setEquations(safeEquations);
+      setImages(safeImages);
+      setStrokeCount(safeStrokes.length);
       requestAnimationFrame(() => redrawBoard());
     });
 
@@ -1088,11 +1120,56 @@ function WhiteboardPage() {
       redrawBoard();
     });
 
+    // Receive shapes from other users
+    socket.on("shape:create", (shape) => {
+      const shapeStroke = { ...shape, kind: "shape" };
+      strokesRef.current.push(shapeStroke);
+      historyRef.current.push({ kind: "stroke", value: shapeStroke });
+      redrawBoard();
+    });
+
+    // Receive textboxes from other users
+    socket.on("textbox:create", (textBox) => {
+      setTextBoxes(prev => [...prev, textBox]);
+      historyRef.current.push({ kind: "textbox", value: textBox });
+    });
+
+    // Receive textbox updates from other users
+    socket.on("textbox:update", (textBox) => {
+      setTextBoxes(prev => prev.map(t => t.id === textBox.id ? textBox : t));
+    });
+
+    // Receive equations from other users
+    socket.on("equation:create", (equation) => {
+      setEquations(prev => [...prev, equation]);
+      historyRef.current.push({ kind: "equation", value: equation });
+    });
+
+    // Receive equation updates from other users
+    socket.on("equation:update", (equation) => {
+      setEquations(prev => prev.map(e => e.id === equation.id ? equation : e));
+    });
+
+    // Receive images from other users
+    socket.on("image:create", (image) => {
+      setImages(prev => [...prev, image]);
+      historyRef.current.push({ kind: "image", value: image });
+    });
+
+    // Receive image updates from other users
+    socket.on("image:update", (image) => {
+      setImages(prev => prev.map(i => i.id === image.id ? image : i));
+    });
+
     // Board was cleared by someone
     socket.on("board:cleared", () => {
       strokesRef.current = [];
+      objectsRef.current = [];
       historyRef.current = [];
       redoStackRef.current = [];
+      setTextBoxes([]);
+      setEquations([]);
+      setImages([]);
       setStrokeCount(0);
       redrawBoard();
       setStatus("Board cleared by another user");
@@ -1101,6 +1178,13 @@ function WhiteboardPage() {
     return () => {
       socket.off("board:state");
       socket.off("stroke:create");
+      socket.off("shape:create");
+      socket.off("textbox:create");
+      socket.off("textbox:update");
+      socket.off("equation:create");
+      socket.off("equation:update");
+      socket.off("image:create");
+      socket.off("image:update");
       socket.off("board:cleared");
     };
   }, [settings.roomName]);
@@ -1523,6 +1607,10 @@ function WhiteboardPage() {
               );
             }}
             onPointerUp={() => {
+              if (movingImageIdRef.current) {
+                const moved = images.find(i => i.id === movingImageIdRef.current);
+                if (moved) getSocket()?.emit("image:update", moved);
+              }
               movingImageIdRef.current = null;
             }}
             onPointerCancel={() => {
@@ -1569,6 +1657,10 @@ function WhiteboardPage() {
                     );
                   }}
                   onPointerUp={() => {
+                    if (resizingImageIdRef.current) {
+                      const resized = images.find(i => i.id === resizingImageIdRef.current);
+                      if (resized) getSocket()?.emit("image:update", resized);
+                    }
                     resizingImageIdRef.current = null;
                     imageResizeStartRef.current = null;
                   }}
@@ -1633,6 +1725,8 @@ function WhiteboardPage() {
                 const nextValue = textarea.value;
                 setTextBoxes(previous => previous.map(item => item.id === textBox.id ? { ...item, value: nextValue } : item));
                 resizeTextArea(textarea);
+                const updated = { ...textBox, value: nextValue };
+                getSocket()?.emit("textbox:update", updated);
               }}
               onKeyDown={event => {
                 if (event.key === "Escape") {
