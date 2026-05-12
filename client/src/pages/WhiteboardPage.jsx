@@ -1123,6 +1123,7 @@ function WhiteboardPage() {
 
     // Load existing board state from server when joining
     socket.on("board:state", ({ strokes, shapes, textBoxes, equations, images, fills }) => {
+      console.log("board:state fills:", fills);
       const safeStrokes   = strokes    || [];
       const safeShapes    = shapes     || [];
       const safeTextBoxes = textBoxes  || [];
