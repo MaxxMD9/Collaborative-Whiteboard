@@ -475,14 +475,20 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-  const fill = item.value;
-  const pixelRatio = window.devicePixelRatio || 1;
+        const fillImage = ensureFillImage(item.value);
 
-  const canvasX = Math.floor((fill.x * camera.zoom + camera.x) * pixelRatio);
-  const canvasY = Math.floor((fill.y * camera.zoom + camera.y) * pixelRatio);
-
-  applyFloodFill(canvasX, canvasY, fill.color, fill.tolerance);
-}
+        if (fillImage && fillImage.complete) {
+          // Fill snapshots are full-canvas bitmap states, so draw them in screen/canvas space.
+          ctx.restore();
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(fillImage, 0, 0);
+          ctx.restore();
+          ctx.save();
+          ctx.translate(camera.x, camera.y);
+          ctx.scale(camera.zoom, camera.zoom);
+        }
+      }
     }
     if (currentStrokeRef.current) {
       drawFullStroke(ctx, currentStrokeRef.current);
@@ -828,63 +834,6 @@ function WhiteboardPage() {
       Math.abs(a[3] - b[3]) <= tolerance
     );
   }
-
-  function applyFloodFill(x, y, fillHex, toleranceValue) {
-  const canvas = canvasRef.current;
-  const ctx = getCanvasContext();
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  const startIndex = (y * canvas.width + x) * 4;
-  const targetColor = [
-    data[startIndex],
-    data[startIndex + 1],
-    data[startIndex + 2],
-    data[startIndex + 3]
-  ];
-
-  const fillColor = hexToRgbArray(fillHex);
-  const tolerance = Number(toleranceValue);
-
-  if (colorsMatch(targetColor, fillColor, tolerance)) return;
-
-  const stack = [[x, y]];
-  const visited = new Uint8Array(canvas.width * canvas.height);
-
-  while (stack.length > 0) {
-    const [currentX, currentY] = stack.pop();
-
-    if (currentX < 0 || currentY < 0 || currentX >= canvas.width || currentY >= canvas.height) continue;
-
-    const pixelIndex = currentY * canvas.width + currentX;
-    if (visited[pixelIndex]) continue;
-
-    visited[pixelIndex] = 1;
-
-    const index = pixelIndex * 4;
-    const currentColor = [
-      data[index],
-      data[index + 1],
-      data[index + 2],
-      data[index + 3]
-    ];
-
-    if (!colorsMatch(currentColor, targetColor, tolerance)) continue;
-
-    data[index] = fillColor[0];
-    data[index + 1] = fillColor[1];
-    data[index + 2] = fillColor[2];
-    data[index + 3] = fillColor[3];
-
-    stack.push([currentX + 1, currentY]);
-    stack.push([currentX - 1, currentY]);
-    stack.push([currentX, currentY + 1]);
-    stack.push([currentX, currentY - 1]);
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-}
 
   // Fills an area using the paint bucket
   function floodFill(screenX, screenY) {
