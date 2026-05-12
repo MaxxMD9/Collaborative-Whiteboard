@@ -31,7 +31,7 @@ function AboutPage() {
 
 
 
-        <Link to="/whiteboard" className="sign-in-button">
+        <Link to="/lobby" className="sign-in-button">
           Sign in
         </Link>
       </header>
@@ -46,7 +46,7 @@ function AboutPage() {
             </p>
 
             <div className="hero-actions">
-              <Link to="/whiteboard" className="primary-button">
+              <Link to="/lobby" className="primary-button">
                 Start Drawing
               </Link>
 
