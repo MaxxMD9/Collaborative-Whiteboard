@@ -464,23 +464,9 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        if (item.value.imageData) {
-          // Local session: use pixel-accurate snapshot (fastest, no zoom artifacts)
-          ctx.restore();
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.putImageData(item.value.imageData, 0, 0);
-          ctx.restore();
-          // Re-apply camera transform for subsequent items
-          ctx.save();
-          ctx.translate(camera.x, camera.y);
-          ctx.scale(camera.zoom, camera.zoom);
-        } else {
-          // Restored from server: use world-space rect (no imageData available)
-          // No save/restore here — we're already inside the camera transform
-          ctx.fillStyle = item.value.color;
-          ctx.fillRect(-100000, -100000, 200000, 200000);
-        }
+        // Always use world-space rect — works for both local and restored fills
+        ctx.fillStyle = item.value.color;
+        ctx.fillRect(-100000, -100000, 200000, 200000);
       }
     }
     if (currentStrokeRef.current) {
@@ -872,16 +858,10 @@ function WhiteboardPage() {
     }
     ctx.putImageData(imageData, 0, 0);
 
-    // Store imageData for local undo/redo (pixel-accurate), and color for socket/persistence
-    const newFill = {
-      id: crypto.randomUUID(),
-      imageData,                      // local only — not sent over socket
-      color: colorRef.current,        // persisted and synced
-      createdAt: Date.now()
-    };
+    const newFill = { id: crypto.randomUUID(), color: colorRef.current, createdAt: Date.now() };
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    getSocket()?.emit("fill:create", { id: newFill.id, color: newFill.color, createdAt: newFill.createdAt });
+    getSocket()?.emit("fill:create", newFill);
     setStatus("Fill complete");
   }
 
@@ -1123,7 +1103,6 @@ function WhiteboardPage() {
 
     // Load existing board state from server when joining
     socket.on("board:state", ({ strokes, shapes, textBoxes, equations, images, fills }) => {
-      console.log("board:state fills:", fills);
       const safeStrokes   = strokes    || [];
       const safeShapes    = shapes     || [];
       const safeTextBoxes = textBoxes  || [];
@@ -1132,15 +1111,18 @@ function WhiteboardPage() {
       const safeFills     = fills      || [];
 
       strokesRef.current = safeStrokes;
-      historyRef.current = [
-        ...safeStrokes.map(s => ({ kind: "stroke",   value: s })),
-        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" } })),
-        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t })),
-        ...safeEquations.map(e => ({ kind: "equation", value: e })),
-        ...safeImages.map(i  => ({ kind: "image",    value: i })),
-        // fills from server have no imageData — redrawBoard uses world-space rect fallback
-        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, imageData: null } })),
+
+      // Rebuild history sorted by createdAt so elements render in the correct order
+      const allItems = [
+        ...safeStrokes.map(s => ({ kind: "stroke",   value: s,                          t: s.createdAt || 0 })),
+        ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },    t: s.createdAt || 0 })),
+        ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                          t: t.createdAt || 0 })),
+        ...safeEquations.map(e => ({ kind: "equation", value: e,                         t: e.createdAt || 0 })),
+        ...safeImages.map(i  => ({ kind: "image",    value: i,                           t: i.createdAt || 0 })),
+        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, imageData: null },   t: f.createdAt || 0 })),
       ];
+      allItems.sort((a, b) => a.t - b.t);
+      historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
 
       objectsRef.current = safeShapes.map(s => ({ ...s, kind: "shape" }));
 
