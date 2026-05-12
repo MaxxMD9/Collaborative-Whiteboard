@@ -477,16 +477,12 @@ function WhiteboardPage() {
       if (item.kind === "fill") {
         const fillImage = ensureFillImage(item.value);
 
-        if (fillImage && fillImage.complete) {
-          // Fill snapshots are full-canvas bitmap states, so draw them in screen/canvas space.
-          ctx.restore();
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.drawImage(fillImage, 0, 0);
-          ctx.restore();
-          ctx.save();
-          ctx.translate(camera.x, camera.y);
-          ctx.scale(camera.zoom, camera.zoom);
+        if (item.kind === "fill") {
+          const fillImage = ensureFillImage(item.value);
+
+          if (fillImage && fillImage.complete) {
+            ctx.drawImage(fillImage, -camera.x / camera.zoom, -camera.y / camera.zoom);
+          }
         }
       }
     }
