@@ -362,6 +362,23 @@ function WhiteboardPage() {
     return canvasRef.current.getContext("2d");
   }
 
+  // For re-handling fill
+  function serializeImageData(imageData) {
+    return {
+      width: imageData.width,
+      height: imageData.height,
+      data: Array.from(imageData.data)
+    };
+  }
+  // Ditto
+  function deserializeImageData(serialized) {
+    return new ImageData(
+      new Uint8ClampedArray(serialized.data),
+      serialized.width,
+      serialized.height
+    );
+  }
+
   function getColorWithOpacity(hex, opacity) {
     return hexToRgba(hex, Number(opacity));
   }
@@ -464,21 +481,15 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        if (item.value.cachedImage) {
-          // Draw pre-cached image outside camera transform
-          ctx.restore();
+        if (item.kind === "fill") {
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.drawImage(item.value.cachedImage, 0, 0);
+          ctx.putImageData(deserializeImageData(item.value.imageData), 0, 0);
           ctx.restore();
+
           ctx.save();
           ctx.translate(camera.x, camera.y);
           ctx.scale(camera.zoom, camera.zoom);
-        } else if (item.value.snapshot) {
-          const img = new Image();
-          img.onload = () => redrawBoard();
-          img.src = item.value.snapshot;
-          item.value.cachedImage = img;
         }
       }
     }
@@ -872,25 +883,16 @@ function WhiteboardPage() {
     ctx.putImageData(imageData, 0, 0);
 
     // Capture the canvas state as base64 AFTER the flood fill
-    const camera = cameraRef.current;
-    const snapshot = canvasRef.current.toDataURL("image/png");
     const newFill = {
       id: crypto.randomUUID(),
-      snapshot,                        // base64 PNG — used for local replay
-      snapshotCamera: { ...camera },   // camera state at time of fill
-      color: colorRef.current,
+      imageData: serializeImageData(imageData),
       createdAt: Date.now()
     };
-    // Pre-cache as an Image element for synchronous drawing in redrawBoard
-    const cachedImage = new Image();
-    cachedImage.onload = () => redrawBoard();
-    cachedImage.src = snapshot;
-    newFill.cachedImage = cachedImage;
 
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    // Only send color to server (snapshot too large)
-    getSocket()?.emit("fill:create", { id: newFill.id, snapshot: newFill.snapshot, color: newFill.color, createdAt: newFill.createdAt });
+    getSocket()?.emit("fill:create", newFill);
+    setStatus("Fill complete");
     setStatus("Fill complete");
   }
 
@@ -979,8 +981,13 @@ function WhiteboardPage() {
 
     redrawBoard();
     setStatus("Undo complete");
+
     if (item.kind === "stroke") {
-      getSocket()?.emit("stroke:undo");
+      getSocket()?.emit("stroke:undo", item.value.id);
+    }
+
+    if (item.kind === "fill") {
+      getSocket()?.emit("fill:undo", item.value.id);
     }
   }
 
@@ -1160,7 +1167,7 @@ function WhiteboardPage() {
         ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },                       t: s.createdAt || 0 })),
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
-        ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
+        ...safeFills.map(f => ({ kind: "fill", value: f,                                                    t: f.createdAt || 0 })),
         ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, restored: true },                      t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
