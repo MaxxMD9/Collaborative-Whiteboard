@@ -477,10 +477,9 @@ function WhiteboardPage() {
           ctx.scale(camera.zoom, camera.zoom);
         } else {
           // Restored from server: use world-space rect (no imageData available)
-          ctx.save();
+          // No save/restore here — we're already inside the camera transform
           ctx.fillStyle = item.value.color;
           ctx.fillRect(-100000, -100000, 200000, 200000);
-          ctx.restore();
         }
       }
     }
