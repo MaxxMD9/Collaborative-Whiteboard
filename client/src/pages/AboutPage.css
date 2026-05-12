@@ -271,25 +271,34 @@ body {
   width: 100%;
   padding: 42px 24px 80px;
 
-  background-image: none;
-  background-size: cover;
-  background-position: center top;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background: #ffffff;
 
   border-top: 1px solid #e5e7eb;
-
-  transition:
-    background-image 0s linear 0.2s,
-    background-color 0.3s ease;
 }
+
+/* Animated background layer */
 .showcase-section::before {
   content: "";
 
   position: absolute;
   inset: 0;
 
+  background-image: url("/assets/showcase_background.png");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+
+  opacity: 0;
+
+  transition: opacity 0.75s ease;
+
   pointer-events: none;
+}
+
+/* Fade background in when opened */
+.showcase-section.open::before {
+  opacity: 1;
 }
 
 .showcase-toggle, .showcase-content {
@@ -350,10 +359,6 @@ body {
 
   transition:
     background-color 0.3s ease;
-}
-
-.showcase-section.open {
-  background-image: url("/assets/showcase_background.png");
 }
 
 .showcase-section.open .showcase-content {
