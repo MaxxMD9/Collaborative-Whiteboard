@@ -871,10 +871,8 @@ function WhiteboardPage() {
     ctx.putImageData(imageData, 0, 0);
 
     // Capture the canvas state as base64 AFTER the flood fill
-    // Also store camera state so we can restore it correctly
-    const canvas = canvasRef.current;
     const camera = cameraRef.current;
-    const snapshot = canvas.toDataURL("image/png");
+    const snapshot = canvasRef.current.toDataURL("image/png");
     const newFill = {
       id: crypto.randomUUID(),
       snapshot,                        // base64 PNG — used for local replay
