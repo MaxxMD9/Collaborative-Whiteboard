@@ -964,7 +964,10 @@ function WhiteboardPage() {
 
     redrawBoard();
     setStatus("Undo complete");
-    getSocket()?.emit("stroke:undo");
+    // Only sync stroke undos with the server — fills, textboxes etc. are managed client-side
+    if (item.kind === "stroke") {
+      getSocket()?.emit("stroke:undo");
+    }
   }
 
   // Ctrl + Y
