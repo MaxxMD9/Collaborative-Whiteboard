@@ -481,16 +481,14 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        if (item.kind === "fill") {
-          ctx.save();
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.putImageData(deserializeImageData(item.value.imageData), 0, 0);
-          ctx.restore();
-
-          ctx.save();
-          ctx.translate(camera.x, camera.y);
-          ctx.scale(camera.zoom, camera.zoom);
+        if (!item.value.imageData || !item.value.imageData.data) {
+          continue;
         }
+
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.putImageData(deserializeImageData(item.value.imageData), 0, 0);
+        ctx.restore();
       }
     }
     if (currentStrokeRef.current) {
@@ -968,16 +966,7 @@ function WhiteboardPage() {
       setSelectedImageId(null);
     }
 
-    if (item.kind === "fill") {
-      if (item.value.restored) {
-        // This is a server-restored fill — put it back, can't undo it
-        historyRef.current.push(item);
-        redoStackRef.current.pop(); // don't add to redo
-        setStatus("Cannot undo a fill from a previous session");
-        return;
-      }
-      // Session fill — already popped, redrawBoard handles it
-    }
+
 
     redrawBoard();
     setStatus("Undo complete");
@@ -1167,8 +1156,7 @@ function WhiteboardPage() {
         ...safeShapes.map(s  => ({ kind: "stroke",   value: { ...s, kind: "shape" },                       t: s.createdAt || 0 })),
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
-        ...safeFills.map(f => ({ kind: "fill", value: f,                                                    t: f.createdAt || 0 })),
-        ...safeFills.map(f   => ({ kind: "fill",     value: { ...f, restored: true },                      t: f.createdAt || 0 })),
+        ...safeFills.filter(f => f.imageData && f.imageData.data).map(f => ({ kind: "fill", value: f, t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
