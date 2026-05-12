@@ -466,17 +466,10 @@ function WhiteboardPage() {
         drawFullStroke(ctx, item.value);
       }
       if (item.kind === "fill") {
-        const fill = item.value;
-
-        const replayX = fill.canvasWidth
-          ? fill.x * (canvas.width / fill.canvasWidth)
-          : fill.x;
-
-        const replayY = fill.canvasHeight
-          ? fill.y * (canvas.height / fill.canvasHeight)
-          : fill.y;
-
-        applyFloodFill(replayX, replayY, fill.color, fill.tolerance);
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.putImageData(item.value.imageData, 0, 0);
+        ctx.restore();
       }
     }
     if (currentStrokeRef.current) {
@@ -887,7 +880,7 @@ function WhiteboardPage() {
     }
 
     ctx.putImageData(imageData, 0, 0);
-    return true;
+    return imageData;
   }
 
   // Determine what passes with the tolerance
@@ -908,29 +901,23 @@ function WhiteboardPage() {
     const canvasX = Math.floor(screenX * pixelRatio);
     const canvasY = Math.floor(screenY * pixelRatio);
 
-    const didFill = applyFloodFill(
+    const filledImageData = applyFloodFill(
       canvasX,
       canvasY,
       colorRef.current,
       Number(fillTolerance)
     );
 
-    if (!didFill) return;
+    if (!filledImageData) return;
 
     const newFill = {
       id: crypto.randomUUID(),
-      x: canvasX,
-      y: canvasY,
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-      color: colorRef.current,
-      tolerance: Number(fillTolerance),
+      imageData: filledImageData,
       createdAt: Date.now()
     };
 
     historyRef.current.push({ kind: "fill", value: newFill });
     redoStackRef.current = [];
-    getSocket()?.emit("fill:create", newFill);
     setStatus("Fill complete");
   }
 
@@ -1201,7 +1188,6 @@ function WhiteboardPage() {
         ...safeTextBoxes.map(t => ({ kind: "textbox", value: t,                                             t: t.createdAt || 0 })),
         ...safeEquations.map(e => ({ kind: "equation", value: e,                                            t: e.createdAt || 0 })),
         ...safeImages.map(i  => ({ kind: "image",    value: i,                                              t: i.createdAt || 0 })),
-        ...safeFills .filter(f => typeof f.x === "number" && typeof f.y === "number" && f.color).map(f => ({ kind: "fill", value: f, t: f.createdAt || 0 })),
       ];
       allItems.sort((a, b) => a.t - b.t);
       historyRef.current = allItems.map(({ kind, value }) => ({ kind, value }));
@@ -1256,12 +1242,6 @@ function WhiteboardPage() {
       setEquations(prev => prev.map(e => e.id === equation.id ? equation : e));
     });
 
-    // Receive fills from other users (no imageData — use world-space rect fallback)
-    socket.on("fill:create", (fill) => {
-      historyRef.current.push({ kind: "fill", value: fill });
-      redrawBoard();
-    });
-
     // Receive images from other users
     socket.on("image:create", (image) => {
       setImages(prev => [...prev, image]);
@@ -1295,7 +1275,6 @@ function WhiteboardPage() {
       socket.off("textbox:update");
       socket.off("equation:create");
       socket.off("equation:update");
-      socket.off("fill:create");
       socket.off("image:create");
       socket.off("image:update");
       socket.off("board:cleared");
