@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import SettingsPanel from "../components/SettingsPanel.jsx";
+import SettingsPanel from "../components/settingsPanel.jsx";
 import "./WhiteboardPage.css";
 
 import "katex/dist/katex.min.css";
@@ -855,9 +855,15 @@ function WhiteboardPage() {
       stack.push([currentX, currentY - 1]);
     }
     ctx.putImageData(imageData, 0, 0);
-    const fillSnapshot = { id: crypto.randomUUID(), kind: "imageData", imageData };
-    historyRef.current = historyRef.current.filter(item => item.kind !== "imageData");
-    historyRef.current.push({ kind: "imageData", value: fillSnapshot });
+    const fillSnapshot = {
+      id: crypto.randomUUID(),
+      imageData
+    };
+
+    historyRef.current.push({
+      kind: "imageData",
+      value: fillSnapshot
+    });
     redoStackRef.current = [];
     setStatus("Fill complete");
   }
@@ -1446,32 +1452,36 @@ function WhiteboardPage() {
             Clear
           </button>
 
-          <div className="toolbar-right-controls">
-            <label className="control-group">
-              Color
-              <button
-                type="button"
-                className="color-preview-button"
-                style={{ backgroundColor: color }}
+        
+        </nav>
+
+        <div className="toolbar-second-row">
+          <label className="control-group">
+            Color
+
+            <button
+              type="button"
+              className="color-preview-button"
+              style={{ backgroundColor: color }}
                 onClick={() => {
-                  if (isColorPickerOpen) {
-                    colorInputRef.current.blur();
-                    setIsColorPickerOpen(false);
-                    return;
-                  }
-                  setIsColorPickerOpen(true);
-                  colorInputRef.current.click();
-                }}
-              />
-              <input
-                ref={colorInputRef}
-                type="color"
-                value={color}
-                className="hidden-color-input"
-                onChange={handleColorChange}
-                onBlur={() => setIsColorPickerOpen(false)}
-              />
-            </label>
+                if (isColorPickerOpen) {
+                  colorInputRef.current.blur();
+                  setIsColorPickerOpen(false);
+                  return;
+                }
+                setIsColorPickerOpen(true);
+                colorInputRef.current.click();
+              }}
+            />
+          <input
+            ref={colorInputRef}
+            type="color"
+            value={color}
+            className="hidden-color-input"
+            onChange={handleColorChange}
+            onBlur={() => setIsColorPickerOpen(false)}
+          />
+          </label>
             <label className="control-group">
               Size
               <input
@@ -1481,10 +1491,9 @@ function WhiteboardPage() {
                 value={size}
                 onChange={event => setSize(Number(event.target.value))}
               />
-              <span className="size-value">{size}px</span>
-            </label>
-          </div>
-        </nav>
+            <span className="size-value">{size}px</span>
+          </label>
+        </div>
 
         <button
           className="tool-button"
